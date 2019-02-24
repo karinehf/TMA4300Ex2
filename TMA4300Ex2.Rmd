@@ -5,8 +5,24 @@ date: "18 2 2019"
 output: pdf_document
 ---
 
+
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+#knitr::opts_chunk$set(echo = TRUE)
+library(formatR)
+showsol <- FALSE
+library(knitr)
+opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE, error = FALSE, message = FALSE, echo = TRUE)
+
 ```
 
+```{r}
+#Loading libraries
+library(ggplot2)
 
+#Set seed so that the task can be reproduced
+set.seed(42)
+```
+
+#Exercise 1: Derivations
+```{r, child = 'text/task1.Rmd'}
+```

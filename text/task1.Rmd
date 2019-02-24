@@ -1,0 +1,64 @@
+---
+title: "task1"
+output: pdf_document
+---
+##a)
+
+From the definition of conditional probability and the nature of the assumptions in this exercise, we know that
+\begin{align*}
+\text{p}(\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v|\boldsymbol{y})&\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u,\kappa_v)\text{p}(\kappa_u\,|\kappa_v)\text{p}(\kappa_v)\\
+&\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta})\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u)\text{p}(\kappa_u)\text{p}(\kappa_v).
+\end{align*}
+By inserting the corresponding probabilities, this becomes
+\begin{align*}
+\text{p}&\propto\left(\prod_{i=1}^n\left(E_ie^{\eta_i}\right)^{y_i}e^{E_ie^{\eta_i}}\right)\left|\kappa_v\text{I}\right|^\frac{1}{2}e^{-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})}\kappa_u^{(n-1)/2}e^{-\frac{\kappa_u}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u}}\kappa_u^{\alpha_u-1}e^{-\beta_u\kappa_u}\kappa_v^{\alpha_v-1}e^{-\beta_v\kappa_v}\\
+&\propto\kappa_u^{\frac{n-1}{2}+\alpha_u-1}\kappa_v^{\frac{n}{2}+\alpha_v-1}\exp\left\{-\beta_u\kappa_u-\beta_v\kappa_v-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})-\frac{\kappa_u}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u}+\sum_i\left(y_i\eta_i-E_ie^{\eta_i}\right)\right\}.
+\end{align*}
+
+##b)
+
+The sum over $e^{\eta_i}$ in the posterior means that the full conditional of $\eta_i$ is difficult to sample from. We therefore want to approximate the distribution of $\boldsymbol{\eta}$ it with a multivariate normal in order to use Metropolis-Hastings steps for it. We define the function
+$$
+f(\eta_i)=y_i\eta_i-E_ie^{\eta_i},
+$$
+which has derivatives
+\begin{align*}
+f'(\eta_i)&=y_i-E_ie^{\eta_i}\\
+f''(\eta_i)&=-E_ie^{\eta_i}.
+\end{align*}
+This yeilds the following Taylor series expansion of $f$ around $z_i$,
+\begin{align*}
+\tilde{f}(\eta_i)&=y_iz_i-E_ie^{z_i}+(y_i-E_ie^{z_i})(\eta_i-z_i)+\frac{1}{2}(-E_ie^{z_i})(\eta_i-z_i)^2\\
+&=a(z_i)+b(z_i)\eta_i-\frac{1}{2}c(z_i)\eta_i^2,
+\end{align*}
+where $a(z_i)=E_ie^{z_i}(z_i-z_i^2/2-1)$, $b(z_i) = y_i+E_ie^{z_i}(z_i-1)$ and $c(z_i) = E_ie^{z_i}$.
+
+##c)
+
+As $\text{p}(\theta_i|\boldsymbol{\theta}_{\backslash i},\boldsymbol{y})\propto\text{p}(\boldsymbol{\theta}|\boldsymbol{y})$, we can quite easily find the full conditionals from the posterior. Using this, we see that
+$$
+\text{p}(\kappa_u|\boldsymbol{y},\kappa_v,\boldsymbol{\eta},\boldsymbol{u})\propto\kappa_u^{(n-1)/2+\alpha_u-1}e^{-(\beta_u+\frac{1}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u})\kappa_u}.
+$$
+We recognise this as the core of a gamma distribution which means that the full conditional density of $\kappa_u$ is gamma$(\frac{n-1}{2}+\alpha_u,\beta_u+\frac{1}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u})$. By the same reasoning, we see that gamma$(\frac{n}{2}+\alpha_v,\beta_v+\frac{1}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u}))$ is the full conditional density of $\kappa_v$. Similarly
+\begin{align*}
+\text{p}(\boldsymbol{u}|\boldsymbol{y},\boldsymbol{\eta}.\kappa_u,\kappa_v)&\propto\exp\left\{-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})-\frac{\kappa_u}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u}\right\}\\
+&\propto \exp\left\{-\frac{1}{2}\boldsymbol{u}^T(\kappa_u\textbf{R}+\kappa_v\text{I})\boldsymbol{u}+\kappa_v\boldsymbol{u}^T\boldsymbol{\eta}\right\}.
+\end{align*}
+We recognise this as the canonical form of a multivariate normal distribution. All these distributions are easy to sample from, and can be used in the Gibbs algorithm directly.
+
+The full conditional distribution for $\boldsymbol{\eta}$ however takes the form
+$$
+\text{p}(\boldsymbol\eta|\boldsymbol{y},\boldsymbol{u},\kappa_u,\kappa_v)\propto
+\exp\left\{-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})+\sum_if(\eta_i)\right\}.
+$$
+This does not correspond to any standard distribution, but by applying the approximation $\tilde{f}(\eta_i)$, we get
+\begin{align*}
+\text{q}(\boldsymbol\eta|\boldsymbol{z},\boldsymbol{y},\boldsymbol{u},\kappa_u,\kappa_v)&\propto\exp\left\{-\frac{\kappa_v}{2}\boldsymbol{\eta}^T\boldsymbol{\eta}+\kappa_v\boldsymbol{\eta}^T\boldsymbol{u}-\frac{1}{2}\boldsymbol{\eta}^T\text{diag}(c(\boldsymbol{z}))\boldsymbol{\eta}+\boldsymbol{\eta}^Tb(\boldsymbol{z})\right\}\\
+&=\exp\left\{-\frac{1}{2}\boldsymbol{\eta}^T\Big(\kappa_v\textbf{I}+\text{diag}(c(\boldsymbol{z}))\Big)\boldsymbol{\eta}+\boldsymbol{\eta}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{z}))\right\},
+\end{align*}
+where $\boldsymbol{z}=[z_1,...,z_n]^T$ is the point around which we Taylor expand $f$, $b(\boldsymbol{z})=[b(z_1),...,b(z_n)]^T$ and $c(\boldsymbol{z})=[c(z_1),...,c(z_n)]^T$. $\text{q}$ is the canonical form of a multivariate normal distribution, and can be used for Metropolis-Hastings steps for $\boldsymbol{\eta}$.
+
+
+
+
+
