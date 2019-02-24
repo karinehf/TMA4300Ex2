@@ -1,0 +1,9 @@
+---
+title: "Task2theory"
+output: pdf_document
+---
+
+Before we can implement the Metropolis-Hastings part of the sampler, we need to simplfy the expression for the acceptance propability $\alpha$. If we first consider the ratio between true the full conditionals of $\boldsymbol{\eta^*}$ and $\boldsymbol{\eta}$ we can simply insert into the expression found in 1c)
+$$
+
+$$

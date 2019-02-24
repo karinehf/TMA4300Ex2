@@ -26,3 +26,7 @@ set.seed(42)
 #Exercise 1: Derivations
 ```{r, child = 'text/task1.Rmd'}
 ```
+
+#Exercise 2: Implementation of the MCMC sampler
+```{r, child="text/task2theory.Rmd"}
+```
