@@ -5,5 +5,19 @@ output: pdf_document
 
 Before we can implement the Metropolis-Hastings part of the sampler, we need to simplfy the expression for the acceptance propability $\alpha$. If we first consider the ratio between true the full conditionals of $\boldsymbol{\eta^*}$ and $\boldsymbol{\eta}$ we can simply insert into the expression found in 1c)
 $$
-
+\frac{\text{p}(\boldsymbol{\eta^*}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{p}(\boldsymbol{\eta}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}=
+\exp\left\{-\frac{\kappa_v}{2}\boldsymbol{\eta^*}^T\boldsymbol{\eta^*}+\boldsymbol{\eta^*}^T(\kappa_v\boldsymbol{u}+\boldsymbol{y})-\exp(\boldsymbol{\eta^*})^T\mathbf{E}+\frac{\kappa_v}{2}\boldsymbol{\eta}^T\boldsymbol{\eta}-\boldsymbol{\eta}^T(\kappa_v\boldsymbol{u}+\boldsymbol{y})+\exp(\boldsymbol{\eta})^T\mathbf{E}\right\}.
 $$
+Here $\boldsymbol{\eta^*}$ is the proposed $m$'th step, $\boldsymbol{\eta}$ the value of the $(m-1)$'th step while $\boldsymbol{u}$, $\kappa_u$ and $\kappa_v$ are the $m$'th step values. The ratio between the proposal distributions can also be found by insertion
+\begin{align*}
+\frac{\text{q}(\boldsymbol{\eta}|\boldsymbol{\eta^*},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{q}(\boldsymbol{\eta^*}|\boldsymbol{\eta},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}=& \frac{\Big|\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta^*}))\Big|^\frac{1}{2}}{\Big|\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta}))\Big|^\frac{1}{2}}\cdot \\ &\exp\Big\{-\frac{1}{2}\boldsymbol{\eta}^T\Big(\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta^*}))\Big)\boldsymbol{\eta}+\boldsymbol{\eta}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{\eta^*}))+\\ &\frac{1}{2}\boldsymbol{\eta^*}^T\Big(\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta}))\Big)\boldsymbol{\eta^*}-\boldsymbol{\eta^*}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{\eta}))\Big\}.
+\end{align*}
+(dette er stygt, men jeg vet ikke hvordan det kan bli penere). Multiplying these two ratios and using the fact that $b(\boldsymbol{z})=\boldsymbol{y}+\text{diag}(c(\boldsymbol{z}))\boldsymbol{z}-c(\boldsymbol{z})$ and that $\Sigma c(\boldsymbol{z}) = \exp(\boldsymbol{z})^T\mathbf{E}$, we get
+$$
+\alpha = \min\left\{1, \frac{\prod_i(\kappa_v+c(\eta^*_i))}{\prod_i(\kappa_v+c(\eta_i))}\exp\left[c(\boldsymbol{\eta})^T\Big(\text{diag}(\boldsymbol{\eta^*})(\frac{1}{2}\boldsymbol{\eta^*}-\boldsymbol{\eta})+\vec{1}\Big)-c(\boldsymbol{\eta^*})^T\Big(\text{diag}(\boldsymbol{\eta})(\frac{1}{2}\boldsymbol{\eta}-\boldsymbol{\eta^*})+\vec{1}\Big)\right]\right\}
+$$
+
+
+
+
+
