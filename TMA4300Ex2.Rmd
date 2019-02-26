@@ -15,9 +15,30 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE
 
 ```
 
+```{r, eval=FALSE, include=FALSE}
+#Installing packages
+install.packages(c("fields","spam"))
+install.packages("INLA", repos = c(getOption("repos"),
+                 INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+```
+
 ```{r}
 #Loading libraries
 library(ggplot2)
+library(spam) # load the data
+str(Oral) # see structure of data
+#’data.frame’: 544 obs. of 3 variables:
+# $ Y : int 18 62 44 12 18 27 20 29 39 21 . . .
+# $ E : num 16.4 45.9 44.7 16.3 26.9 . . .
+# $ SMR: num 1.101 1.351 0.985 0.735 0.668 . . .
+attach(Oral) # allow direct referencing to Y and E
+# load some libraries to generate nice map plots
+library(fields, warn.conflict=FALSE)
+library(colorspace)
+col <- diverge_hcl(8) # blue - red
+# use a function provided by spam to plot the map together with the mortality rates
+germany.plot(Oral$Y/Oral$E, col=col, legend=TRUE)
+load('additionalFiles/tma4300_ex2_Rmatrix.Rdata')
 
 #Set seed so that the task can be reproduced
 set.seed(42)
@@ -30,3 +51,112 @@ set.seed(42)
 #Exercise 2: Implementation of the MCMC sampler
 ```{r, child="text/task2theory.Rmd"}
 ```
+```{r}
+c = function(z, E){
+  z*E
+}
+
+b = function(z, y, E){
+  y + c(z,E)*(z-1)
+}
+
+drawKappaU = function(n, alpha_u, beta_u, u, R){
+  rgamma(1, (n-1)/2+alpha_u, beta_u + t(u)%*%R%*%u)
+}
+
+drawKappaV = function(n, alpha_v, beta_v, eta, u){
+  rgamma(1, n/2+alpha_v, beta_v+t(eta-u)%*%(eta-u)/2)
+}
+
+drawU = function(n, kappa_u, kappa_v, eta, R){
+  t(rmvnorm.canonical(1, kappa_v/2*eta, kappa_u*R+diag.spam(kappa_v, n, n)))
+}
+
+drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
+  t(rmvnorm.canonical(1, kappa_u*u + b(z,y,E), diag.spam(kappa_v, n, n)))
+}
+
+calculateLogAcceptanceProb = function(etaProp, etaPrev, kappa_v, E){
+  c_prop = c(etaProp, E)
+  c_prev = c(etaPrev, E)
+  logProb = (sum(log(kappa_v+c_prop))-sum(log(kappa_v+c_prev)))/2+t(c_prev*etaProp)%*%(0.5*etaProp-etaPrev)-t(c_prop*etaPrev)%*%(0.5*etaPrev-etaProp)+sum(c_prev)-sum(c_prop)
+}
+
+MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, R){
+  
+  #Fetching starting values
+  eta_prev = starting_values[['eta']]
+  u = starting_values[['u']]
+  kappa_u = starting_values[['kappa_u']]
+  kappa_v = starting_values[['kappa_v']]
+  
+  n = length(y)
+  
+  #Create matrices to contain all steps
+  eta_values = matrix(nrow = n, ncol = M)
+  u_values = matrix(nrow = n, ncol = M)
+  kappa_u_vals = vector(length = M)
+  kappa_v_vals = vector(length = M)
+  
+  eta_values[,1] = eta_prev
+  u_values[,1] = u
+  kappa_v_vals[1] = kappa_v
+  kappa_u_vals[1] = kappa_u
+  
+  acceptance_rates = vector(length = M-1)
+  num_accepted = 0
+  
+  for(i in 2:M){
+    #Generate next step for u and kappas
+    kappa_u = drawKappaU(n, alpha_u, beta_u, u, R)
+    kappa_v = drawKappaV(n, alpha_v, beta_v, eta_prev, u)
+    u = drawU(n, kappa_u, kappa_v, eta_prev, R)
+    
+    #prpose eta
+    eta = drawEta(n, eta_prev, y, kappa_v, kappa_u, u, E)
+    
+    #generate acceptance variable
+    decision_var = runif(1)
+    #check for acceptance
+    log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
+    acceptance_rates[i] = min(1, exp(log_acceptance))
+    if(log(decision_var)<log_acceptance){
+      eta_prev = eta
+      num_accepted = num_accepted +1
+    }
+    
+    #Update value matrix
+    eta_values[,i] = eta_prev
+    u_values[,i] = u
+    kappa_v_vals[i] = kappa_v
+    kappa_u_vals[i] = kappa_u
+  }
+  return(list(eta = eta_values, u = u_values, kappa_u =kappa_u_vals, kappa_v=kappa_v_vals, acceptance_rates =  acceptance_rates, num_accepted=num_accepted))
+}
+
+
+M = 1000
+y = Oral$Y
+E = Oral$E
+alpha_u = 1
+alpha_v = 1
+beta_u = 0.01
+beta_v = 0.01
+
+n = length(y)
+u_start = matrix(0,ncol = 1, nrow = n)
+eta_start = matrix(0,nrow = n, ncol=1)
+kappa_u_start = 100
+kappa_v_start = 100
+starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, kappa_v = kappa_v_start)
+
+samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
+
+```
+
+
+
+
+
+
+
