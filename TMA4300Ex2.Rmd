@@ -75,7 +75,7 @@ b_func = function(z, y, E){
 
 #Added 1/2 in the last term - taken away because it failed...?
 drawKappaU = function(n, alpha_u, beta_u, u, R){
-  rgamma(1, (n-1)/2+alpha_u, rate = beta_u + t(u)%*%R%*%u)
+  rgamma(1, (n-1)/2+alpha_u, rate = beta_u + t(u)%*%R%*%u/2)
 }
 
 drawKappaV = function(n, alpha_v, beta_v, eta, u){
@@ -89,14 +89,14 @@ drawU = function(n, kappa_u, kappa_v, eta, R){
 
 #Added diag.spam(c_func(z,E)) in precision matrix
 drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
-  t(rmvnorm.canonical(1, kappa_u*u + b_func(z,y,E), diag.spam(as.vector(c_func(z,E)))+ diag.spam(kappa_v, n, n)))
+  t(rmvnorm.canonical(1, kappa_v*u + b_func(z,y,E), diag.spam(as.vector(c_func(z,E)))+ diag.spam(kappa_v, n, n)))
 }
 
 #Did not manage to check this...
 calculateLogAcceptanceProb = function(etaProp, etaPrev, kappa_v, E){
   c_prop = c_func(etaProp, E)
   c_prev = c_func(etaPrev, E)
-  logProb = (sum(log(kappa_v+c_prop))-sum(log(kappa_v+c_prev)))/2+t(c_prev*etaProp)%*%(0.5*etaProp-etaPrev)-t(c_prop*etaPrev)%*%(0.5*etaPrev-etaProp)+sum(c_prev)-sum(c_prop)
+  logProb = (sum(log(kappa_v+c_prop))-sum(log(kappa_v+c_prev)))/2+t(c_prev*etaProp)%*%(0.5*etaProp-etaPrev)-t(c_prop*etaPrev)%*%(0.5*etaPrev-etaProp)+sum(c_prev)-sum(c_prop)+t(etaProp)%*%c_prev-t(etaPrev)%*%c_prop
 }
 
 ```
@@ -167,7 +167,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
 
 ```{r}
 #Set parameters
-M = 200
+M = 1000
 y = Oral$Y
 E = Oral$E
 alpha_u = 1
