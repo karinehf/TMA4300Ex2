@@ -1,9 +1,15 @@
 ---
 title: "TMA4300Ex2"
-author: "Karine Foss"
+author: "Karine H. Foss & August S. Mathisen"
 date: "18 2 2019"
 output: pdf_document
 ---
+Comments: 
+* Need to explain better what $q(\eta)$ is. This is proposal distribution?
+* Which elements in the canonical form of mvnorm are the precision matrix etc?
+* ex3: says u and v in text; should be eta?
+* ex3: should we remove burn-in period before performing test? (and acf?)
+* ex5: says exp(u), but should be eta??
 
 
 ```{r setup, include=FALSE}
@@ -17,17 +23,18 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE
 
 ```{r, eval=FALSE, include=FALSE}
 #Installing packages
-install.packages(c("fields","spam"))
-install.packages("INLA", repos = c(getOption("repos"),
-                 INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+#install.packages(c("fields","spam"))
+#install.packages("INLA", repos = c(getOption("repos"),
+#                 INLA="https://inla.r-inla-download.org/R/stable"), #dep=TRUE)
 ```
 
 ```{r}
 #Loading libraries
 library(ggplot2)
+library(gridExtra)
 library(spam) # load the data
 str(Oral) # see structure of data
-#’data.frame’: 544 obs. of 3 variables:
+#???data.frame???: 544 obs. of 3 variables:
 # $ Y : int 18 62 44 12 18 27 20 29 39 21 . . .
 # $ E : num 16.4 45.9 44.7 16.3 26.9 . . .
 # $ SMR: num 1.101 1.351 0.985 0.735 0.668 . . .
@@ -35,6 +42,8 @@ attach(Oral) # allow direct referencing to Y and E
 # load some libraries to generate nice map plots
 library(fields, warn.conflict=FALSE)
 library(colorspace)
+
+
 col <- diverge_hcl(8) # blue - red
 # use a function provided by spam to plot the map together with the mortality rates
 germany.plot(Oral$Y/Oral$E, col=col, legend=TRUE)
@@ -51,38 +60,52 @@ set.seed(42)
 #Exercise 2: Implementation of the MCMC sampler
 ```{r, child="text/task2theory.Rmd"}
 ```
+
 ```{r}
-c = function(z, E){
-  z*E
+#Define functions to be used in the MCMC
+
+#Changed from z to exp(z) here
+c_func = function(z, E){
+  exp(z)*E
 }
 
-b = function(z, y, E){
-  y + c(z,E)*(z-1)
+b_func = function(z, y, E){
+  y + c_func(z,E)*(z-1)
 }
 
+#Added 1/2 in the last term - taken away because it failed...?
 drawKappaU = function(n, alpha_u, beta_u, u, R){
-  rgamma(1, (n-1)/2+alpha_u, beta_u + t(u)%*%R%*%u)
+  rgamma(1, (n-1)/2+alpha_u, rate = beta_u + t(u)%*%R%*%u)
 }
 
 drawKappaV = function(n, alpha_v, beta_v, eta, u){
-  rgamma(1, n/2+alpha_v, beta_v+t(eta-u)%*%(eta-u)/2)
+  rgamma(1, n/2+alpha_v, rate = beta_v+t(eta-u)%*%(eta-u)/2)
 }
 
+#Dropped dividing with 2 in first term
 drawU = function(n, kappa_u, kappa_v, eta, R){
-  t(rmvnorm.canonical(1, kappa_v/2*eta, kappa_u*R+diag.spam(kappa_v, n, n)))
+  t(rmvnorm.canonical(1, kappa_v*eta, kappa_u*R+diag.spam(kappa_v, n, n)))
 }
 
+#Added diag.spam(c_func(z,E)) in precision matrix
 drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
-  t(rmvnorm.canonical(1, kappa_u*u + b(z,y,E), diag.spam(kappa_v, n, n)))
+  t(rmvnorm.canonical(1, kappa_u*u + b_func(z,y,E), diag.spam(as.vector(c_func(z,E)))+ diag.spam(kappa_v, n, n)))
 }
 
+#Did not manage to check this...
 calculateLogAcceptanceProb = function(etaProp, etaPrev, kappa_v, E){
-  c_prop = c(etaProp, E)
-  c_prev = c(etaPrev, E)
+  c_prop = c_func(etaProp, E)
+  c_prev = c_func(etaPrev, E)
   logProb = (sum(log(kappa_v+c_prop))-sum(log(kappa_v+c_prev)))/2+t(c_prev*etaProp)%*%(0.5*etaProp-etaPrev)-t(c_prop*etaPrev)%*%(0.5*etaPrev-etaProp)+sum(c_prev)-sum(c_prop)
 }
 
+```
+
+```{r}
+#MCMC function
 MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, R){
+  #Get computing time
+  time_start = Sys.time()
   
   #Fetching starting values
   eta_prev = starting_values[['eta']]
@@ -117,10 +140,15 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     
     #generate acceptance variable
     decision_var = runif(1)
+    
     #check for acceptance
     log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
-    acceptance_rates[i] = min(1, exp(log_acceptance))
-    if(log(decision_var)<log_acceptance){
+    
+    #Using log_acceptance further
+    acceptance_rates[i] = min(0, log_acceptance)
+    
+    #Changed from log_acceptance to acceptance_rates[i]:
+    if(log(decision_var)<acceptance_rates[i]){
       eta_prev = eta
       num_accepted = num_accepted +1
     }
@@ -131,11 +159,15 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     kappa_v_vals[i] = kappa_v
     kappa_u_vals[i] = kappa_u
   }
-  return(list(eta = eta_values, u = u_values, kappa_u =kappa_u_vals, kappa_v=kappa_v_vals, acceptance_rates =  acceptance_rates, num_accepted=num_accepted))
+  time_end = Sys.time()
+  #Return all values in a list
+  return(list(eta = eta_values, u = u_values, kappa_u =kappa_u_vals, kappa_v=kappa_v_vals, acceptance_rates =  acceptance_rates, num_accepted=num_accepted, time = time_end-time_start))
 }
+```
 
-
-M = 1000
+```{r}
+#Set parameters
+M = 200
 y = Oral$Y
 E = Oral$E
 alpha_u = 1
@@ -143,20 +175,284 @@ alpha_v = 1
 beta_u = 0.01
 beta_v = 0.01
 
+#Set initial values
 n = length(y)
 u_start = matrix(0,ncol = 1, nrow = n)
 eta_start = matrix(0,nrow = n, ncol=1)
 kappa_u_start = 100
 kappa_v_start = 100
 starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, kappa_v = kappa_v_start)
+```
 
+```{r, eval = TRUE}
+
+#Test function
+set.seed(4300)
 samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
+
+#Save and load, so we don't need to do it over and over again
+#save(samples, file = 'MCMCsamples.RData', ascii=TRUE)
+#load('MCMCsamples.RData')
+#M = length(samples$kappa_u)
+```
+
+
+#Exercise 3: Convergence diagnostics
+##a) Trace plots
+```{r}
+#Trace plots Kappa
+trace.kappa_u = 
+  ggplot(data.frame(kappa = samples$kappa_u), aes(x=1:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
+
+trace.kappa_v = 
+  ggplot(data.frame(kappa = samples$kappa_v), aes(x=1:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
+
+trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
+```
+
+```{r, eval = FALSE, include=FALSE}
+#Save trace plot
+ggsave("figures/traceKappa.pdf", plot = trace.kappa_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+```
+
+
+```{r}
+#Trace plots somecomponents of u and eta
+#Choose components: 
+set.seed(4301)
+comp = ceiling(n*runif(3))
+trace.u = list()
+trace.eta = list()
+
+#labels
+lab = paste("comp", comp)
+
+#Make first plots with title
+  trace.u[[1]] = 
+  ggplot(data.frame(u = samples$u[comp[1],]), aes(x=1:M, y = u)) + geom_line()+ ggtitle("MCMC trace plots: u components") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab(lab[1])
+
+trace.eta[[1]] = 
+  ggplot(data.frame(eta = samples$eta[comp[1],]), aes(x=1:M, y = eta)) + geom_line()+ ggtitle("MCMC trace plots: eta components") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations')+ ylab(lab[1])
+
+#Next plots do not need title
+for (i in 2:length(comp)){
+  trace.u[[i]] = 
+  ggplot(data.frame(u = samples$u[comp[i],]), aes(x=1:M, y = u)) + geom_line() + xlab('Iterations')+ ylab(lab[i])
+
+trace.eta[[i]] = 
+  ggplot(data.frame(eta = samples$eta[comp[i],]), aes(x=1:M, y = eta)) + geom_line() + xlab('Iterations')+ ylab(lab[i])
+}
+
+trace.u_plot = grid.arrange(grobs = trace.u, ncol = 1)
+trace.eta_plot = grid.arrange(grobs = trace.eta, ncol = 1)
+```
+
+```{r, eval = FALSE, include = FALSE}
+#Save trace plots
+ggsave("figures/traceU.pdf", plot = trace.u_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+
+ggsave("figures/traceEta.pdf", plot = trace.eta_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+```
+
+**Remove burn-in here?**
+```{r}
+#Define burn-in area
+
+#cut.u = 
+#cut.eta = 
+#cut.kappa_u = 
+#cut.kappa_v = 
+
+#Cut burn-in samples
+
+#relevant.u = samples$u[,(cut.u+1):M]
+#relevant.eta = samples$eta[,(cut.eta+1):M]
+#relevant.kappa_u = samples$kappa_u[(cut.kappa_u+1):M]
+#relevant.kappa_v = samples$kappa_v[(cut.kappa_v+1):M]
+```
+
+##b) Autocorrelation plots
+```{r}
+acf.kappa_u = acf(samples$kappa_u, plot = FALSE)
+acf.kappa_v = acf(samples$kappa_v, plot = FALSE)
+
+plot1 = ggplot(data.frame(acf = acf.kappa_u$acf, lag = acf.kappa_u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + ylab('acf kappa_u')
+
+plot2 = ggplot(data.frame(acf = acf.kappa_v$acf, lag = acf.kappa_v$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ylab('acf kappa_v')
+
+acf.kappa_plot = grid.arrange(grobs = list(plot1, plot2), ncol = 1)
+```
+```{r}
+#acf for u and eta
+plot_u = list()
+plot_eta = list()
+
+#Make first plots with title
+acf.u = acf(samples$u[comp[1],], plot = FALSE)
+plot_u[[1]] = ggplot(data.frame(acf = acf.u$acf, lag = acf.u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: u components") + theme(plot.title = element_text(hjust = 0.5)) + ylab(lab[1])
+
+acf.eta = acf(samples$eta[comp[1],], plot = FALSE)
+plot_eta[[1]] = ggplot(data.frame(acf = acf.eta$acf, lag = acf.eta$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: eta components") + theme(plot.title = element_text(hjust = 0.5)) + ylab(lab[1])
+
+#Next plots do not need title
+for (i in 2:length(comp)){
+  acf.u = acf(samples$u[comp[i],], plot = FALSE)
+  plot_u[[i]] = ggplot(data.frame(acf = acf.u$acf, lag = acf.u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ylab(lab[i])
+
+  acf.eta = acf(samples$eta[comp[i],], plot = FALSE)
+  plot_eta[[i]] = ggplot(data.frame(acf = acf.eta$acf, lag = acf.eta$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ylab(lab[i])
+}
+
+acf.u_plot = grid.arrange(grobs = plot_u, ncol = 1)
+acf.eta_plot = grid.arrange(grobs = plot_eta, ncol = 1)
 
 ```
 
 
 
+```{r, eval = FALSE, include = FALSE}
+#Save acf plots
+ggsave("figures/acfKappa.pdf", plot = acf.kappa_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+
+#Save trace plots
+ggsave("figures/acfU.pdf", plot = acf.u_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+
+ggsave("figures/acfEta.pdf", plot = acf.eta_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+```
 
 
+##Convergence?
+geweke.diag() performs a test for convergence of the markov chain.
+**Guess we have to remove the burn-in?**
+It takes one fraction of the beginning of the chain and one fraction of the end. If the chain has converged to the stationary distribution, the two means should be equal. The geweke test statistic is asymptotically standard normal distributed.
+The null hypothesis is that the chain has converged.**??**
+**Have I done it right?**
+```{r}
+library(coda)
+#Apply geweke test: 
+gew.kappa_u = geweke.diag(samples$kappa_u)
+gew.kappa_v = geweke.diag(samples$kappa_v)
 
+gew.u1 = geweke.diag(samples$u[comp[1],])
+gew.u2 = geweke.diag(samples$u[comp[2],])
+gew.u3 = geweke.diag(samples$u[comp[3],])
+
+gew.eta1 = geweke.diag(samples$eta[comp[1],])
+gew.eta2 = geweke.diag(samples$eta[comp[2],])
+gew.eta3 = geweke.diag(samples$eta[comp[3],])
+
+#p-values
+p_vals= c(2*pnorm(abs(gew.kappa_u$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.kappa_v$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.u1$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.u2$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.u3$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.eta1$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.eta2$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.eta3$z), lower.tail = FALSE))
+conclusion = ifelse(p_vals<0.05, "->reject", "-> do not reject")
+```
+
+```{r, echo = FALSE}
+cat('kappa_u:')
+print(gew.kappa_u)
+cat( 'kappa_u: test stat',gew.kappa_u$z, ' p-value', p_vals[1], conclusion[1], '\n')
+cat( 'kappa_v: test stat',gew.kappa_v$z, p_vals[2], conclusion[2], '\n')
+
+cat('u comp', comp[1], ': test stat', gew.u1$z, p_vals[3], conclusion[3], '\n')
+cat('u comp', comp[2], ': test stat', gew.u2$z, p_vals[4], conclusion[4],'\n')
+cat('u comp', comp[3], ': test stat', gew.u3$z, p_vals[5], conclusion[5],'\n')
+
+cat('eta comp', comp[1], ': test stat', gew.eta1$z, p_vals[6], conclusion[6], '\n')
+cat('eta comp', comp[2], ': test stat', gew.eta2$z, p_vals[7], conclusion[7],'\n')
+cat('eta comp', comp[3], ': test stat', gew.eta3$z, p_vals[8], conclusion[8],'\n')
+
+```
+
+**Conclusion?**
+Heheee, so far it is not correct...
+
+#Exercise 4: Effective sample set
+
+```{r}
+effSize.kappa_u = effectiveSize(samples$kappa_u)
+effSize.kappa_v = effectiveSize(samples$kappa_v)
+```
+
+**interpret the values**
+These values mean that out of the $M$ samples of the MCMC, we "effectively" have $xxx$ samples from the posterior distributions.
+
+**How could the MCMC be changed to increas the effective sample size?**
+Choose the initial values more carefully?
+
+```{r}
+comp_time = as.numeric(samples$time)#Check that this always gives seconds
+#comp_time = 100 #For testing when the time was not computed
+relEffSize.kappa_u = effSize.kappa_u/comp_time
+relEffSize.kappa_v= effSize.kappa_v/comp_time
+```
+
+```{r, echo = FALSE}
+cat('Relative effective sample size for kappa_u is ', relEffSize.kappa_u, '\n')
+cat('Relative effective sample size for kappa_v is ', relEffSize.kappa_v, '\n')
+```
+The relaive effective sample size is the effective sample size obtained per second of running the MCMC. This could be interesting, as it gives us some meaure of how efficient the MCMC algorithm is. Low computer time is not good in itself if the algorithm does not draw enough samples from the target distribution. Likewise, large effective sample size is of course desireble, but if the algorithm has to run for an unreasonable long time, some improvement of the algorithm or sampling approach should maybe be considered. 
+
+These numbers in themselves might not be too informative, but in relation to other approaches, they will give some measure of which to use.
+
+#Exercise 5: Interpretation of result
+**u or eta?**
+
+```{r}
+post_median = exp(apply(samples$u, 1, median))
+
+germany.plot(post_median, col=col, legend=TRUE)
+```
+
+**Interpret**
+
+
+#Exercise 6: INLA
+
+##a)
+R-INLA can also be used to approximate oral cancer in Germany.
+```{r}
+#Build the same model using INLA
+library(INLA)
+g <- system.file("demodata/germany.graph", package="INLA")
+
+#Known values and parameters (copied from task2)
+y = Oral$Y
+E = Oral$E
+alpha_u = 1
+alpha_v = 1
+beta_u = 0.01
+beta_v = 0.01
+n = length(y)
+```
+
+```{r}
+#INLAOral = inla(
+#  formula = y ~ f(u, model = "besag", graph = g, hyper = , constr = ) + 
+#    f(v, model = "iid", hyper = , constr = ), 
+# family = "poisson",
+# data = data.frame(y)
+#)
+#Have to define the prior of u and v? What else is missing?
+#Are the names in f(.) correct? Do we need anything else?
+
+```
+
+```{r}
+#Test function
+```
+
+```{r}
+#Marginal posteriors and histograms
+
+```
+
+
+##b)
+We will now add some explanatory factors for getting oral cancer.
 
