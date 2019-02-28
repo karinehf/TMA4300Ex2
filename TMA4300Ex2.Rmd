@@ -5,11 +5,12 @@ date: "18 2 2019"
 output: pdf_document
 ---
 Comments: 
-* Need to explain better what $q(\eta)$ is. This is proposal distribution?
-* Which elements in the canonical form of mvnorm are the precision matrix etc?
-* ex3: says u and v in text; should be eta?
-* ex3: should we remove burn-in period before performing test? (and acf?)
-* ex5: says exp(u), but should be eta??
+
+*  Need to explain better what $q(\eta)$ is. This is proposal distribution?
+*  Which elements in the canonical form of mvnorm are the precision matrix etc?
+*  ex3: says u and v in text; should be eta?
+*  ex3: should we remove burn-in period before performing test? (and acf?)
+*  ex5: says exp(u), but should be eta??
 
 
 ```{r setup, include=FALSE}
@@ -42,6 +43,7 @@ attach(Oral) # allow direct referencing to Y and E
 # load some libraries to generate nice map plots
 library(fields, warn.conflict=FALSE)
 library(colorspace)
+source('additionalFiles/dmvnorm.R')
 
 
 col <- diverge_hcl(8) # blue - red
@@ -90,6 +92,10 @@ drawU = function(n, kappa_u, kappa_v, eta, R){
 #Added diag.spam(c_func(z,E)) in precision matrix
 drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
   t(rmvnorm.canonical(1, kappa_v*u + b_func(z,y,E), diag.spam(as.vector(c_func(z,E)))+ diag.spam(kappa_v, n, n)))
+}
+
+logFullCondEta = function(eta, kappa_v, u, y, E){
+  kappa_v*sum(eta^2)/2+sum(eta*u)*kappa_v + sum(eta*y)-sum(exp(eta)*E)
 }
 
 #Did not manage to check this...
@@ -142,7 +148,8 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     decision_var = runif(1)
     
     #check for acceptance
-    log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
+    #log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
+    log_acceptance = logFullCondEta(eta, kappa_v, u, y, E)-logFullCondEta(eta_prev, kappa_v, u, y, E) + dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))-dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
     
     #Using log_acceptance further
     acceptance_rates[i] = min(0, log_acceptance)
@@ -167,7 +174,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
 
 ```{r}
 #Set parameters
-M = 1000
+M = 2000
 y = Oral$Y
 E = Oral$E
 alpha_u = 1
@@ -202,10 +209,10 @@ samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 ```{r}
 #Trace plots Kappa
 trace.kappa_u = 
-  ggplot(data.frame(kappa = samples$kappa_u), aes(x=1:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
+  ggplot(data.frame(kappa = samples$kappa_u[500:M]), aes(x=500:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
 
 trace.kappa_v = 
-  ggplot(data.frame(kappa = samples$kappa_v), aes(x=1:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
+  ggplot(data.frame(kappa = samples$kappa_v[500:M]), aes(x=500:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
 
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
@@ -429,30 +436,75 @@ alpha_v = 1
 beta_u = 0.01
 beta_v = 0.01
 n = length(y)
+OralData = cbind(Oral, Region = Germany$region, Region.struct = Germany$region)
 ```
 
 ```{r}
-#INLAOral = inla(
-#  formula = y ~ f(u, model = "besag", graph = g, hyper = , constr = ) + 
-#    f(v, model = "iid", hyper = , constr = ), 
-# family = "poisson",
-# data = data.frame(y)
-#)
-#Have to define the prior of u and v? What else is missing?
-#Are the names in f(.) correct? Do we need anything else?
+INLAOral = inla(
+  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = FALSE)-1, 
+ family = "poisson",
+ E=E,
+ data = OralData
+)
 
-```
-
-```{r}
-#Test function
 ```
 
 ```{r}
 #Marginal posteriors and histograms
+u_inla = INLASmoking2$marginals.random[[1]]
 
+plot(u_inla[[1]], type = 'l')
+
+#inla.hyperpar(INLAOral)
+```
+```{r}
+u_median = c()
+
+for (i in 1:544){
+  u_median[i] = median(u_inla[[i]])
+}
+
+```
+
+
+
+```{r}
+
+germany.plot(exp(u_median), col=col, legend=TRUE)
 ```
 
 
 ##b)
 We will now add some explanatory factors for getting oral cancer.
+
+```{r}
+smoking = read.table("additionalFiles/smoking.dat")
+
+OralData["smoking"] = smoking
+
+```
+
+```{r}
+
+INLAOSmoking1 = inla(
+  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = FALSE)-1 + smoking, 
+ family = "poisson",
+ E=E,
+ data = OralData
+)
+
+```
+
+```{r}
+
+INLASmoking2 = inla(
+  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = FALSE) + f(smoking, model = 'rw2', hyper = list(prec = list(prior = "loggamma")), constr = FALSE)-1, 
+ family = "poisson",
+ E=E,
+ data = OralData
+)
+```
 
