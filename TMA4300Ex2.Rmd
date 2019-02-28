@@ -95,7 +95,7 @@ drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
 }
 
 logFullCondEta = function(eta, kappa_v, u, y, E){
-  kappa_v*sum(eta^2)/2+sum(eta*u)*kappa_v + sum(eta*y)-sum(exp(eta)*E)
+  -kappa_v*sum(eta^2)/2+sum(eta*u)*kappa_v + sum(eta*y)-sum(exp(eta)*E)
 }
 
 #Did not manage to check this...
