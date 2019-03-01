@@ -3,12 +3,23 @@ title: "Task2theory"
 output: pdf_document
 ---
 
+
+
+
+
 Before we can implement the Metropolis-Hastings part of the sampler, we need to simplfy the expression for the acceptance propability $\alpha$. If we first consider the ratio between true the full conditionals of $\boldsymbol{\eta^*}$ and $\boldsymbol{\eta}$ we can simply insert into the expression found in 1c)
 $$
 \frac{\text{p}(\boldsymbol{\eta^*}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{p}(\boldsymbol{\eta}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}=
 \exp\left\{-\frac{\kappa_v}{2}\boldsymbol{\eta^*}^T\boldsymbol{\eta^*}+\boldsymbol{\eta^*}^T(\kappa_v\boldsymbol{u}+\boldsymbol{y})-\exp(\boldsymbol{\eta^*})^T\mathbf{E}+\frac{\kappa_v}{2}\boldsymbol{\eta}^T\boldsymbol{\eta}-\boldsymbol{\eta}^T(\kappa_v\boldsymbol{u}+\boldsymbol{y})+\exp(\boldsymbol{\eta})^T\mathbf{E}\right\}.
 $$
-Here $\boldsymbol{\eta^*}$ is the proposed $m$'th step, $\boldsymbol{\eta}$ the value of the $(m-1)$'th step while $\boldsymbol{u}$, $\kappa_u$ and $\kappa_v$ are the $m$'th step values. The ratio between the proposal distributions can also be found by insertion
+Here $\boldsymbol{\eta^*}$ is the proposed $m$'th step, $\boldsymbol{\eta}$ the value of the $(m-1)$'th step while $\boldsymbol{u}$, $\kappa_u$ and $\kappa_v$ are the $m$'th step values. The ratio between the proposal distributions is possible to calculate using the function `dmvnorm.canonical()`. Checking for acceptance therefore consists of evaluating the log of the above equation, finding the values for q from `dmvnorm.canonical()` and then cheking wether the log of your decision variable is smaller than the resulting quantity. 
+
+
+
+
+(this is cute and all, but probably belongs in an appendix as it is not used)
+
+The ratio between the proposal distributions can also be found by insertion
 \begin{align*}
 \frac{\text{q}(\boldsymbol{\eta}|\boldsymbol{\eta^*},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{q}(\boldsymbol{\eta^*}|\boldsymbol{\eta},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}=& \frac{\Big|\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta^*}))\Big|^\frac{1}{2}}{\Big|\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta}))\Big|^\frac{1}{2}}\cdot \\ &\exp\Big\{-\frac{1}{2}\boldsymbol{\eta}^T\Big(\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta^*}))\Big)\boldsymbol{\eta}+\boldsymbol{\eta}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{\eta^*}))+\\ &\frac{1}{2}\boldsymbol{\eta^*}^T\Big(\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta}))\Big)\boldsymbol{\eta^*}-\boldsymbol{\eta^*}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{\eta}))\Big\}.
 \end{align*}
