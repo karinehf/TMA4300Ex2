@@ -4,7 +4,7 @@ output: pdf_document
 ---
 ##a)
 
-From the definition of conditional probability and the nature of the assumptions in this exercise, we know that
+From the definition of conditional probability and the nature of the assumptions in this project, we know that the full conditional distribtuion has the form
 \begin{align*}
 \text{p}(\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v|\boldsymbol{y})&\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u,\kappa_v)\text{p}(\kappa_u\,|\kappa_v)\text{p}(\kappa_v)\\
 &\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta})\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u)\text{p}(\kappa_u)\text{p}(\kappa_v).
