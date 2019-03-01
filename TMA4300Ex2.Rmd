@@ -29,6 +29,10 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE
 #                 INLA="https://inla.r-inla-download.org/R/stable"), #dep=TRUE)
 ```
 
+```{r, child = 'text/introduction.Rmd'}
+```
+
+
 ```{r}
 #Loading libraries
 library(ggplot2)
@@ -75,7 +79,6 @@ b_func = function(z, y, E){
   y + c_func(z,E)*(z-1)
 }
 
-#Added 1/2 in the last term - taken away because it failed...?
 drawKappaU = function(n, alpha_u, beta_u, u, R){
   rgamma(1, shape = (n-1)/2+alpha_u, rate = beta_u + 0.5*t(u)%*%R%*%u)
 }
@@ -84,12 +87,10 @@ drawKappaV = function(n, alpha_v, beta_v, eta, u){
   rgamma(1, shape = n/2+alpha_v, rate = beta_v+0.5*sum((eta-u)^2))
 }
 
-#Dropped dividing with 2 in first term
 drawU = function(n, kappa_u, kappa_v, eta, R){
   t(rmvnorm.canonical(1, kappa_v*eta, kappa_u*R+diag.spam(kappa_v, n, n)))
 }
 
-#Added diag.spam(c_func(z,E)) in precision matrix
 drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
   t(rmvnorm.canonical(1, kappa_v*u + b_func(z,y,E), diag.spam(as.vector(c_func(z,E)))+ diag.spam(kappa_v, n, n)))
 }
@@ -98,7 +99,7 @@ logFullCondEta = function(eta, kappa_v, u, y, E){
   -kappa_v*0.5*t(eta)%*%eta+t(eta)%*%u*kappa_v + t(eta)%*%y-t(exp(eta))%*%E
 }
 
-#Did not manage to check this...
+#Not in use anymore:
 calculateLogAcceptanceProb = function(etaProp, etaPrev, kappa_v, E){
   c_prop = c_func(etaProp, E)
   c_prev = c_func(etaPrev, E)
@@ -107,6 +108,7 @@ calculateLogAcceptanceProb = function(etaProp, etaPrev, kappa_v, E){
 
 ```
 
+Now we implement the MCMC algorithm. It updates each of the components at a time. That is, it follows the Gibbs sampler. For $\boldsymbol\eta$, a metropolis-hastings step is needed, as the full conditional is not on a form that can easily be sampled from in itself. The proposal density is a gaussian density found from Taylor expansion around the value in the previous step.
 ```{r}
 #MCMC function
 MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, R){
@@ -154,7 +156,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     q_eta = dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E)+kappa_v)), log=TRUE)
     q_eta_prev = dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))+kappa_v), log=TRUE)
     log_acceptance = p_eta-p_eta_prev+q_eta_prev-q_eta
-    #logFullCondEta(eta, kappa_v, u, y, E)-logFullCondEta(eta_prev, kappa_v, u, y, E) + dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))-dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
+    
     
     #Using log_acceptance further
     acceptance_rates[i] = min(1, exp(log_acceptance))
@@ -177,6 +179,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
 }
 ```
 
+Known values, the number of samples and initial values are set before we run the sampler.
 ```{r}
 #Set parameters
 M = 50000
@@ -191,14 +194,13 @@ beta_v = 0.01
 n = length(y)
 u_start = matrix(0,ncol = 1, nrow = n)
 eta_start = matrix(0,nrow = n, ncol=1)
-kappa_u_start = 200
-kappa_v_start = 200
+kappa_u_start = 100
+kappa_v_start = 100
 starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, kappa_v = kappa_v_start)
 ```
 
 ```{r, eval = TRUE}
-
-#Test function
+#Run function.
 set.seed(4300)
 samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 
@@ -210,10 +212,15 @@ samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 
 
 #Exercise 3: Convergence diagnostics
+We will now do some analysis of the result of the MCMC. First, we will obtain some diagnostic summaries for a set of the parameters. We will try to conclude whether the chain has converged to the target/stationary distribuition.
+
 ##a) Trace plots
+First, we look at the trace plots for $\kappa_u$ and $\kappa_v$. 
+Figure **x** shows all samples, including the burn-in period in the beginning. In figure **y** the burn-in period is disregarded, to show the variability in the parameters, and figure **z** shows just a small part of the samples, and the individual steps in the algorithm is more visible here.
 ```{r}
+#x
 #Trace plots Kappa
-start = 200
+start = 1
 trace.kappa_u = 
   ggplot(data.frame(kappa = samples$kappa_u[start:M]), aes(x=start:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
 
@@ -223,11 +230,35 @@ trace.kappa_v =
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
 
-```{r, eval = FALSE, include=FALSE}
-#Save trace plot
-ggsave("figures/traceKappa.pdf", plot = trace.kappa_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
+```{r}
+#y
+#Trace plots Kappa
+start = 1000
+trace.kappa_u = 
+  ggplot(data.frame(kappa = samples$kappa_u[start:M]), aes(x=start:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
+
+trace.kappa_v = 
+  ggplot(data.frame(kappa = samples$kappa_v[start:M]), aes(x=start:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
+
+trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
 
+```{r}
+#z
+#Trace plots Kappa
+start = 1000
+stop = 1500
+trace.kappa_u = 
+  ggplot(data.frame(kappa = samples$kappa_u[start:stop]), aes(x=start:stop, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
+
+trace.kappa_v = 
+  ggplot(data.frame(kappa = samples$kappa_v[start:stop]), aes(x=start:stop, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
+
+trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
+```
+
+**u and eta or u and v??**
+Since the vectors of $\boldsymbol\eta$ and $\boldsymbol\u$ are of high dimensions, trace plots are only made for a few, randomly chosen components.
 
 ```{r}
 #Trace plots somecomponents of u and eta
@@ -260,21 +291,16 @@ trace.u_plot = grid.arrange(grobs = trace.u, ncol = 1)
 trace.eta_plot = grid.arrange(grobs = trace.eta, ncol = 1)
 ```
 
-```{r, eval = FALSE, include = FALSE}
-#Save trace plots
-ggsave("figures/traceU.pdf", plot = trace.u_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
-
-ggsave("figures/traceEta.pdf", plot = trace.eta_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
-```
-
+$\boldsymbol\eta$ and $\boldsymbol\u$ seem to have very small burn-in period.
+To be on the safe side, in the further analysis, the first $1000$ samples are disregarded.
 ```{r}
 #Define burn-in area
-
 burnins = 1:1000
-
 ```
 
 ##b) Autocorrelation plots
+
+Autocorrelation plots are made for the same components as the trace plots.
 ```{r}
 acf.kappa_u = acf(samples$kappa_u[-burnins], plot = FALSE)
 acf.kappa_v = acf(samples$kappa_v[-burnins], plot = FALSE)
@@ -285,6 +311,7 @@ plot2 = ggplot(data.frame(acf = acf.kappa_v$acf, lag = acf.kappa_v$lag), aes(x =
 
 acf.kappa_plot = grid.arrange(grobs = list(plot1, plot2), ncol = 1)
 ```
+
 ```{r}
 #acf for u and eta
 plot_u = list()
@@ -310,70 +337,61 @@ acf.u_plot = grid.arrange(grobs = plot_u, ncol = 1)
 acf.eta_plot = grid.arrange(grobs = plot_eta, ncol = 1)
 
 ```
+We see that the steps are quite correlated for the $\kappa$s. From the trace plot in figure **z**, this tendency can be spotted. The mixing does not seem to be very good; the steps are often quite small, so that it takes quite a lot of steps to explore the whole areas.
 
-
-
-```{r, eval = FALSE, include = FALSE}
-#Save acf plots
-ggsave("figures/acfKappa.pdf", plot = acf.kappa_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
-
-#Save trace plots
-ggsave("figures/acfU.pdf", plot = acf.u_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
-
-ggsave("figures/acfEta.pdf", plot = acf.eta_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
-```
-
-
-##Convergence?
+##Convergence test
 geweke.diag() performs a test for convergence of the markov chain.
-**Guess we have to remove the burn-in?**
-It takes one fraction of the beginning of the chain and one fraction of the end. If the chain has converged to the stationary distribution, the two means should be equal. The geweke test statistic is asymptotically standard normal distributed.
-The null hypothesis is that the chain has converged.**??**
-**Have I done it right?**
+It takes one fraction of the beginning of the chain and one fraction of the end of the MCMC. The burn-in period is disregarded. If the chain has converged to the stationary distribution, the two means should be equal. The geweke test statistic is asymptotically standard normal distributed.
+The null hypothesis is that the chain has converged.
+
 ```{r}
 library(coda)
+
+#Make data frame of samples
+u_df = as.data.frame(t(samples$u))
+eta_df = as.data.frame(t(samples$eta))
+
 #Apply geweke test: 
 gew.kappa_u = geweke.diag(samples$kappa_u[-burnins])
 gew.kappa_v = geweke.diag(samples$kappa_v[-burnins])
 
-gew.u1 = geweke.diag(samples$u[comp[1],-burnins])
-gew.u2 = geweke.diag(samples$u[comp[2],-burnins])
-gew.u3 = geweke.diag(samples$u[comp[3],-burnins])
+gew.u = geweke.diag(u_df[-burnins,])
+gew.eta = geweke.diag(eta_df[-burnins,])
 
-gew.eta1 = geweke.diag(samples$eta[comp[1],-burnins])
-gew.eta2 = geweke.diag(samples$eta[comp[2],-burnins])
-gew.eta3 = geweke.diag(samples$eta[comp[3],-burnins])
 
-#p-values
-p_vals= c(2*pnorm(abs(gew.kappa_u$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.kappa_v$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.u1$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.u2$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.u3$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.eta1$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.eta2$z), lower.tail = FALSE),
-          2*pnorm(abs(gew.eta3$z), lower.tail = FALSE))
-conclusion = ifelse(p_vals<0.05, "->reject", "-> do not reject")
+p_u = 2*pnorm(abs(gew.u$z), lower.tail = FALSE)
+p_eta = 2*pnorm(abs(gew.eta$z), lower.tail = FALSE)
+p_kappa = c(2*pnorm(abs(gew.kappa_u$z), lower.tail = FALSE),
+          2*pnorm(abs(gew.kappa_v$z), lower.tail = FALSE))
+
 ```
+
 
 ```{r, echo = FALSE}
 cat('kappa_u:')
 print(gew.kappa_u)
-cat( 'kappa_u: test stat',gew.kappa_u$z, ' p-value', p_vals[1], conclusion[1], '\n')
-cat( 'kappa_v: test stat',gew.kappa_v$z, p_vals[2], conclusion[2], '\n')
+cat( '  kappa_u:     test stat',gew.kappa_u$z, ' p-value', p_kappa[1], '\n')
+cat( '  kappa_v:     test stat',gew.kappa_v$z, ' p-value',p_kappa[2], '\n')
 
-cat('u comp', comp[1], ': test stat', gew.u1$z, p_vals[3], conclusion[3], '\n')
-cat('u comp', comp[2], ': test stat', gew.u2$z, p_vals[4], conclusion[4],'\n')
-cat('u comp', comp[3], ': test stat', gew.u3$z, p_vals[5], conclusion[5],'\n')
+cat('  u comp', comp[1], ': test stat', gew.u1$z, ' p-value', p_u[comp[1]], '\n')
+cat('  u comp', comp[2], ': test stat', gew.u2$z,' p-value', p_u[comp[2]], '\n')
+cat('  u comp', comp[3], ': test stat', gew.u3$z,' p-value', p_u[comp[3]], '\n')
 
-cat('eta comp', comp[1], ': test stat', gew.eta1$z, p_vals[6], conclusion[6], '\n')
-cat('eta comp', comp[2], ': test stat', gew.eta2$z, p_vals[7], conclusion[7],'\n')
-cat('eta comp', comp[3], ': test stat', gew.eta3$z, p_vals[8], conclusion[8],'\n')
+cat('eta comp', comp[1], ': test stat', gew.eta1$z,' p-value', p_eta[comp[1]],'\n')
+cat('eta comp', comp[2], ': test stat', gew.eta2$z,' p-value', p_eta[comp[2]],'\n')
+cat('eta comp', comp[3], ': test stat', gew.eta3$z,' p-value', p_eta[comp[3]],'\n')
+
+```
+
+We make a histogram of all p-values to see whether they seem to be uniformly distributed, as they would be if the null hypothesis is true and the chain has converged.
+```{r}
+ggplot(data = data.frame(p_vals = c(p_u,p_eta, p_kappa), var = c(rep(1, length = length(p_u)), rep(2,length = length(p_eta)), rep(3, length = length(p_kappa))))) + geom_histogram(aes(x = p_vals, y = ..density..))
 
 ```
 
 **Conclusion?**
-Heheee, so far it is not correct...
+For some components, isolated, we will conclude from the geweke test that the samples have not converged to the target distribution. However, overall, the p-values seem at least not far from uniformly distributed. From the trace plots, it looks like the chain has converged. The autocorrelation plots show quite high correlation for some components, but some correlation cannot be avoided, as the proposed steps depend on the previous steps.
+Al in all, it seems the MCMC has converged, but of course, we cannot be completely sure.
 
 #Exercise 4: Effective sample set
 
@@ -383,10 +401,9 @@ effSize.kappa_v = effectiveSize(samples$kappa_v[-burnins])
 ```
 
 **interpret the values**
-These values mean that out of the $M$ samples of the MCMC, we "effectively" have $xxx$ samples from the posterior distributions.
+These values mean that out of the $M$ samples of the MCMC, we "effectively" have $939$ and $348$ samples from the posterior distributions of $\kappa_u$ and $\kappa_v$, respectively. These are **very low!** values.**??**
 
 **How could the MCMC be changed to increas the effective sample size?**
-Choose the initial values more carefully?
 
 ```{r}
 comp_time = as.numeric(samples$time)
@@ -412,7 +429,7 @@ post_median = exp(apply(samples$u, 1, median))
 germany.plot(post_median, col=col, legend=TRUE)
 ```
 
-**Interpret**
+We see that the general tendencies from the data ($y_i/E_i$) in the beginning of the report are still present in this posterior distribution, but that the posterior distribution of the expected number of cancers per region is smoother across region. **meeeh**
 
 
 #Exercise 6: INLA
@@ -469,7 +486,7 @@ for (i in 1:544){
 
 germany.plot(exp(u_median), col=col, legend=TRUE)
 ```
-
+**Dette er fortsatt feil**
 
 ##b)
 We will now add some explanatory factors for getting oral cancer.
@@ -485,7 +502,7 @@ OralData["smoking"] = smoking
 
 INLAOSmoking1 = inla(
   formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))))-1 + smoking, 
+    f(Region, model = "iid", hyper = list(prec=list(param=c(alpha_v,beta_v))))-1 + smoking, 
  family = "poisson",
  E=E,
  data = OralData
