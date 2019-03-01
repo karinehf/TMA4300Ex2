@@ -77,11 +77,11 @@ b_func = function(z, y, E){
 
 #Added 1/2 in the last term - taken away because it failed...?
 drawKappaU = function(n, alpha_u, beta_u, u, R){
-  rgamma(1, shape = (n-1)/2+alpha_u, rate = beta_u + t(u)%*%R%*%u/2)
+  rgamma(1, shape = (n-1)/2+alpha_u, rate = beta_u + 0.5*t(u)%*%R%*%u)
 }
 
 drawKappaV = function(n, alpha_v, beta_v, eta, u){
-  rgamma(1, shape = n/2+alpha_v, rate = beta_v+sum((eta-u)^2)/2)
+  rgamma(1, shape = n/2+alpha_v, rate = beta_v+0.5*sum((eta-u)^2))
 }
 
 #Dropped dividing with 2 in first term
@@ -151,8 +151,8 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     #log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
     p_eta = logFullCondEta(eta, kappa_v, u, y, E)
     p_eta_prev = logFullCondEta(eta_prev, kappa_v, u, y, E)
-    q_eta = dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
-    q_eta_prev = dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))
+    q_eta = dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E)+kappa_v)), log=TRUE)
+    q_eta_prev = dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))+kappa_v), log=TRUE)
     log_acceptance = p_eta-p_eta_prev+q_eta_prev-q_eta
     #logFullCondEta(eta, kappa_v, u, y, E)-logFullCondEta(eta_prev, kappa_v, u, y, E) + dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))-dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
     
@@ -191,8 +191,8 @@ beta_v = 0.01
 n = length(y)
 u_start = matrix(0,ncol = 1, nrow = n)
 eta_start = matrix(0,nrow = n, ncol=1)
-kappa_u_start = 100
-kappa_v_start = 100
+kappa_u_start = 200
+kappa_v_start = 200
 starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, kappa_v = kappa_v_start)
 ```
 
@@ -213,7 +213,7 @@ samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 ##a) Trace plots
 ```{r}
 #Trace plots Kappa
-start = 10000
+start = 200
 trace.kappa_u = 
   ggplot(data.frame(kappa = samples$kappa_u[start:M]), aes(x=start:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
 
@@ -267,27 +267,17 @@ ggsave("figures/traceU.pdf", plot = trace.u_plot, device = NULL, path = NULL, sc
 ggsave("figures/traceEta.pdf", plot = trace.eta_plot, device = NULL, path = NULL, scale = 1, width = 5.5, height = 2*4, units = "in",dpi = 300, limitsize = TRUE)
 ```
 
-**Remove burn-in here?**
 ```{r}
 #Define burn-in area
 
-#cut.u = 
-#cut.eta = 
-#cut.kappa_u = 
-#cut.kappa_v = 
+burnins = 1:1000
 
-#Cut burn-in samples
-
-#relevant.u = samples$u[,(cut.u+1):M]
-#relevant.eta = samples$eta[,(cut.eta+1):M]
-#relevant.kappa_u = samples$kappa_u[(cut.kappa_u+1):M]
-#relevant.kappa_v = samples$kappa_v[(cut.kappa_v+1):M]
 ```
 
 ##b) Autocorrelation plots
 ```{r}
-acf.kappa_u = acf(samples$kappa_u, plot = FALSE)
-acf.kappa_v = acf(samples$kappa_v, plot = FALSE)
+acf.kappa_u = acf(samples$kappa_u[-burnins], plot = FALSE)
+acf.kappa_v = acf(samples$kappa_v[-burnins], plot = FALSE)
 
 plot1 = ggplot(data.frame(acf = acf.kappa_u$acf, lag = acf.kappa_u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + ylab('acf kappa_u')
 
@@ -301,18 +291,18 @@ plot_u = list()
 plot_eta = list()
 
 #Make first plots with title
-acf.u = acf(samples$u[comp[1],], plot = FALSE)
+acf.u = acf(samples$u[comp[1],-burnins], plot = FALSE)
 plot_u[[1]] = ggplot(data.frame(acf = acf.u$acf, lag = acf.u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: u components") + theme(plot.title = element_text(hjust = 0.5)) + ylab(lab[1])
 
-acf.eta = acf(samples$eta[comp[1],], plot = FALSE)
+acf.eta = acf(samples$eta[comp[1],-burnins], plot = FALSE)
 plot_eta[[1]] = ggplot(data.frame(acf = acf.eta$acf, lag = acf.eta$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: eta components") + theme(plot.title = element_text(hjust = 0.5)) + ylab(lab[1])
 
 #Next plots do not need title
 for (i in 2:length(comp)){
-  acf.u = acf(samples$u[comp[i],], plot = FALSE)
+  acf.u = acf(samples$u[comp[i],-burnins], plot = FALSE)
   plot_u[[i]] = ggplot(data.frame(acf = acf.u$acf, lag = acf.u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ylab(lab[i])
 
-  acf.eta = acf(samples$eta[comp[i],], plot = FALSE)
+  acf.eta = acf(samples$eta[comp[i],-burnins], plot = FALSE)
   plot_eta[[i]] = ggplot(data.frame(acf = acf.eta$acf, lag = acf.eta$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ylab(lab[i])
 }
 
@@ -343,16 +333,16 @@ The null hypothesis is that the chain has converged.**??**
 ```{r}
 library(coda)
 #Apply geweke test: 
-gew.kappa_u = geweke.diag(samples$kappa_u)
-gew.kappa_v = geweke.diag(samples$kappa_v)
+gew.kappa_u = geweke.diag(samples$kappa_u[-burnins])
+gew.kappa_v = geweke.diag(samples$kappa_v[-burnins])
 
-gew.u1 = geweke.diag(samples$u[comp[1],])
-gew.u2 = geweke.diag(samples$u[comp[2],])
-gew.u3 = geweke.diag(samples$u[comp[3],])
+gew.u1 = geweke.diag(samples$u[comp[1],-burnins])
+gew.u2 = geweke.diag(samples$u[comp[2],-burnins])
+gew.u3 = geweke.diag(samples$u[comp[3],-burnins])
 
-gew.eta1 = geweke.diag(samples$eta[comp[1],])
-gew.eta2 = geweke.diag(samples$eta[comp[2],])
-gew.eta3 = geweke.diag(samples$eta[comp[3],])
+gew.eta1 = geweke.diag(samples$eta[comp[1],-burnins])
+gew.eta2 = geweke.diag(samples$eta[comp[2],-burnins])
+gew.eta3 = geweke.diag(samples$eta[comp[3],-burnins])
 
 #p-values
 p_vals= c(2*pnorm(abs(gew.kappa_u$z), lower.tail = FALSE),
@@ -388,8 +378,8 @@ Heheee, so far it is not correct...
 #Exercise 4: Effective sample set
 
 ```{r}
-effSize.kappa_u = effectiveSize(samples$kappa_u)
-effSize.kappa_v = effectiveSize(samples$kappa_v)
+effSize.kappa_u = effectiveSize(samples$kappa_u[-burnins])
+effSize.kappa_v = effectiveSize(samples$kappa_v[-burnins])
 ```
 
 **interpret the values**
@@ -447,8 +437,8 @@ OralData = cbind(Oral, Region = Germany$region, Region.struct = Germany$region)
 
 ```{r}
 INLAOral = inla(
-  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = TRUE)-1, 
+  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", hyper = list(prec=list(param=c(alpha_v,beta_v))))-1, 
  family = "poisson",
  E=E,
  data = OralData
@@ -458,7 +448,7 @@ INLAOral = inla(
 
 ```{r}
 #Marginal posteriors and histograms
-u_inla = INLASmoking2$marginals.random[[1]]
+u_inla = INLAOral$marginals.random[[1]]
 
 plot(u_inla[[1]], type = 'l')
 
@@ -495,7 +485,7 @@ OralData["smoking"] = smoking
 
 INLAOSmoking1 = inla(
   formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = TRUE)-1 + smoking, 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))))-1 + smoking, 
  family = "poisson",
  E=E,
  data = OralData
@@ -506,8 +496,8 @@ INLAOSmoking1 = inla(
 ```{r}
 
 INLASmoking2 = inla(
-  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = TRUE) + f(smoking, model = 'rw2', hyper = list(prec = list(prior = "loggamma")), constr = FALSE)-1, 
+  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v)))) + f(smoking, model = 'rw2', hyper = list(prec = list(prior = "loggamma")), constr = FALSE)-1, 
  family = "poisson",
  E=E,
  data = OralData
