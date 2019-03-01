@@ -77,11 +77,11 @@ b_func = function(z, y, E){
 
 #Added 1/2 in the last term - taken away because it failed...?
 drawKappaU = function(n, alpha_u, beta_u, u, R){
-  rgamma(1, (n-1)/2+alpha_u, rate = beta_u + t(u)%*%R%*%u/2)
+  rgamma(1, shape = (n-1)/2+alpha_u, rate = beta_u + t(u)%*%R%*%u/2)
 }
 
 drawKappaV = function(n, alpha_v, beta_v, eta, u){
-  rgamma(1, n/2+alpha_v, rate = beta_v+sum((eta-u)^2)/2)
+  rgamma(1, shape = n/2+alpha_v, rate = beta_v+sum((eta-u)^2)/2)
 }
 
 #Dropped dividing with 2 in first term
@@ -95,7 +95,7 @@ drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
 }
 
 logFullCondEta = function(eta, kappa_v, u, y, E){
-  -kappa_v*sum(eta^2)/2+sum(eta*u)*kappa_v + sum(eta*y)-sum(exp(eta)*E)
+  -kappa_v*0.5*t(eta)%*%eta+t(eta)%*%u*kappa_v + t(eta)%*%y-t(exp(eta))%*%E
 }
 
 #Did not manage to check this...
@@ -149,13 +149,18 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     
     #check for acceptance
     #log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
-    log_acceptance = logFullCondEta(eta, kappa_v, u, y, E)-logFullCondEta(eta_prev, kappa_v, u, y, E) + dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))-dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
+    p_eta = logFullCondEta(eta, kappa_v, u, y, E)
+    p_eta_prev = logFullCondEta(eta_prev, kappa_v, u, y, E)
+    q_eta = dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
+    q_eta_prev = dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))
+    log_acceptance = p_eta-p_eta_prev+q_eta_prev-q_eta
+    #logFullCondEta(eta, kappa_v, u, y, E)-logFullCondEta(eta_prev, kappa_v, u, y, E) + dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))))-dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E))))
     
     #Using log_acceptance further
-    acceptance_rates[i] = min(0, log_acceptance)
+    acceptance_rates[i] = min(1, exp(log_acceptance))
     
     #Changed from log_acceptance to acceptance_rates[i]:
-    if(log(decision_var)<acceptance_rates[i]){
+    if(decision_var<acceptance_rates[i]){
       eta_prev = eta
       num_accepted = num_accepted +1
     }
@@ -168,13 +173,13 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
   }
   time_end = Sys.time()
   #Return all values in a list
-  return(list(eta = eta_values, u = u_values, kappa_u =kappa_u_vals, kappa_v=kappa_v_vals, acceptance_rates =  acceptance_rates, num_accepted=num_accepted, time = time_end-time_start))
+  return(list(eta = eta_values, u = u_values, kappa_u =kappa_u_vals, kappa_v=kappa_v_vals, acceptance_rates =  acceptance_rates, num_accepted=num_accepted, time = difftime(time_end, time_start,units = 'secs')))
 }
 ```
 
 ```{r}
 #Set parameters
-M = 5000
+M = 50000
 y = Oral$Y
 E = Oral$E
 alpha_u = 1
@@ -208,7 +213,7 @@ samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 ##a) Trace plots
 ```{r}
 #Trace plots Kappa
-start = 1
+start = 10000
 trace.kappa_u = 
   ggplot(data.frame(kappa = samples$kappa_u[start:M]), aes(x=start:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
 
@@ -394,7 +399,7 @@ These values mean that out of the $M$ samples of the MCMC, we "effectively" have
 Choose the initial values more carefully?
 
 ```{r}
-comp_time = as.numeric(samples$time)#Check that this always gives seconds
+comp_time = as.numeric(samples$time)
 #comp_time = 100 #For testing when the time was not computed
 relEffSize.kappa_u = effSize.kappa_u/comp_time
 relEffSize.kappa_v= effSize.kappa_v/comp_time
@@ -443,7 +448,7 @@ OralData = cbind(Oral, Region = Germany$region, Region.struct = Germany$region)
 ```{r}
 INLAOral = inla(
   formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = FALSE)-1, 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = TRUE)-1, 
  family = "poisson",
  E=E,
  data = OralData
@@ -490,7 +495,7 @@ OralData["smoking"] = smoking
 
 INLAOSmoking1 = inla(
   formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = FALSE)-1 + smoking, 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = TRUE)-1 + smoking, 
  family = "poisson",
  E=E,
  data = OralData
@@ -502,7 +507,7 @@ INLAOSmoking1 = inla(
 
 INLASmoking2 = inla(
   formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = FALSE) + f(smoking, model = 'rw2', hyper = list(prec = list(prior = "loggamma")), constr = FALSE)-1, 
+    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v))), constr = TRUE) + f(smoking, model = 'rw2', hyper = list(prec = list(prior = "loggamma")), constr = FALSE)-1, 
  family = "poisson",
  E=E,
  data = OralData
