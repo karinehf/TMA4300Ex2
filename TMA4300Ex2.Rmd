@@ -81,7 +81,7 @@ drawKappaU = function(n, alpha_u, beta_u, u, R){
 }
 
 drawKappaV = function(n, alpha_v, beta_v, eta, u){
-  rgamma(1, n/2+alpha_v, rate = beta_v+t(eta-u)%*%(eta-u)/2)
+  rgamma(1, n/2+alpha_v, rate = beta_v+sum((eta-u)^2)/2)
 }
 
 #Dropped dividing with 2 in first term
@@ -174,7 +174,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
 
 ```{r}
 #Set parameters
-M = 2000
+M = 5000
 y = Oral$Y
 E = Oral$E
 alpha_u = 1
@@ -208,11 +208,12 @@ samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 ##a) Trace plots
 ```{r}
 #Trace plots Kappa
+start = 1
 trace.kappa_u = 
-  ggplot(data.frame(kappa = samples$kappa_u[500:M]), aes(x=500:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
+  ggplot(data.frame(kappa = samples$kappa_u[start:M]), aes(x=start:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
 
 trace.kappa_v = 
-  ggplot(data.frame(kappa = samples$kappa_v[500:M]), aes(x=500:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
+  ggplot(data.frame(kappa = samples$kappa_v[start:M]), aes(x=start:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
 
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
