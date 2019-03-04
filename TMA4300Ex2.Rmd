@@ -201,13 +201,13 @@ starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, ka
 
 ```{r, eval = TRUE}
 #Run function.
-set.seed(4300)
-samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
+#set.seed(4300)
+#samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 
 #Save and load, so we don't need to do it over and over again
-#save(samples, file = 'MCMCsamples.RData', ascii=TRUE)
-#load('MCMCsamples.RData')
-#M = length(samples$kappa_u)
+save(samples, file = 'MCMCsamples.RData', ascii=TRUE)
+load('MCMCsamples.RData')
+M = length(samples$kappa_u)
 ```
 
 
@@ -373,13 +373,13 @@ print(gew.kappa_u)
 cat( '  kappa_u:     test stat',gew.kappa_u$z, ' p-value', p_kappa[1], '\n')
 cat( '  kappa_v:     test stat',gew.kappa_v$z, ' p-value',p_kappa[2], '\n')
 
-cat('  u comp', comp[1], ': test stat', gew.u1$z, ' p-value', p_u[comp[1]], '\n')
-cat('  u comp', comp[2], ': test stat', gew.u2$z,' p-value', p_u[comp[2]], '\n')
-cat('  u comp', comp[3], ': test stat', gew.u3$z,' p-value', p_u[comp[3]], '\n')
+cat('  u comp', comp[1], ': test stat', gew.u$z[comp[1]], ' p-value', p_u[comp[1]], '\n')
+cat('  u comp', comp[2], ': test stat', gew.u$z[comp[2]],' p-value', p_u[comp[2]], '\n')
+cat('  u comp', comp[3], ': test stat', gew.u$z[comp[3]],' p-value', p_u[comp[3]], '\n')
 
-cat('eta comp', comp[1], ': test stat', gew.eta1$z,' p-value', p_eta[comp[1]],'\n')
-cat('eta comp', comp[2], ': test stat', gew.eta2$z,' p-value', p_eta[comp[2]],'\n')
-cat('eta comp', comp[3], ': test stat', gew.eta3$z,' p-value', p_eta[comp[3]],'\n')
+cat('eta comp', comp[1], ': test stat', gew.eta$z[comp[1]],' p-value', p_eta[comp[1]],'\n')
+cat('eta comp', comp[2], ': test stat', gew.eta$z[comp[2]],' p-value', p_eta[comp[2]],'\n')
+cat('eta comp', comp[3], ': test stat', gew.eta$z[comp[3]],' p-value', p_eta[comp[3]],'\n')
 
 ```
 
@@ -458,35 +458,90 @@ INLAOral = inla(
     f(Region, model = "iid", hyper = list(prec=list(param=c(alpha_v,beta_v))))-1, 
  family = "poisson",
  E=E,
- data = OralData
+ data = OralData,
+ control.compute = list(dic=TRUE)
 )
 
 ```
 
 ```{r}
 #Marginal posteriors and histograms
-u_inla = INLAOral$marginals.random[[1]]
+kappa_u_marginal = INLAOral$marginals.hyperpar$`Precision for Region.struct`
+kappa_v_marginal = INLAOral$marginals.hyperpar$`Precision for Region`
 
-plot(u_inla[[1]], type = 'l')
+kappa_u_df = as.data.frame(kappa_u_marginal[-(74:75),])
+kappa_v_df = as.data.frame(kappa_v_marginal[-(70:75),])
 
-#inla.hyperpar(INLAOral)
+ggplot(data.frame(kappa = samples$kappa_u[-burnins]), aes(kappa)) + 
+  geom_histogram(aes(y=..density..), binwidth = 0.5,boundary = 0) + 
+  geom_path(aes.inherit = FALSE, data = kappa_u_df, aes(x=x, y=y), col ='red') + 
+  ggtitle("") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+
+
+ggplot(data.frame(kappa = samples$kappa_v[-burnins]), aes(kappa)) + 
+  geom_histogram(aes(y=..density..), binwidth = 10,boundary = 0) + 
+  geom_path(aes.inherit = FALSE, data = kappa_v_df, aes(x=x, y=y), col ='red') + 
+  ggtitle("") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+#samma_det = inla.hyperpar(INLAOral)
 ```
 ```{r}
-u_median = c()
+u_inla = INLAOral$marginals.random$Region.struct[comp]
+v_inla = INLAOral$marginals.random$Region[comp]
+v_MCMC = samples$eta-samples$u
 
-for (i in 1:544){
-  u_median[i] = median(u_inla[[i]])
+u_inla_df = as.data.frame(u_inla[[1]])
+v_inla_df = as.data.frame(v_inla[[1]])
+
+u_plots = list()
+v_plots = list()
+binw = 0.02
+
+u_plots[[1]] = ggplot(data.frame(samp = samples$u[comp[1],-burnins]), aes(samp)) + 
+  geom_histogram(aes(y=..density..), binwidth = binw) + 
+  geom_path(aes.inherit = FALSE, data = u_inla_df, aes(x=x, y=y), col ='red') + 
+  ggtitle("") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+
+v_plots[[1]] = ggplot(data.frame(samp = v_MCMC[comp[1],-burnins]), aes(samp)) + 
+  geom_histogram(aes(y=..density..), binwidth = binw) + 
+  geom_path(aes.inherit = FALSE, data = v_inla_df, aes(x=x, y=y), col ='red') + 
+  ggtitle("") +
+ theme(plot.title = element_text(hjust = 0.5))
+
+for (i in 2:3){
+  u_inla_df = as.data.frame(u_inla[[i]])
+v_inla_df = as.data.frame(v_inla[[i]])
+
+u_plots[[i]] = ggplot(data.frame(samp = samples$u[comp[i],-burnins]), aes(samp)) + 
+  geom_histogram(aes(y=..density..), binwidth = binw) + 
+  geom_path(aes.inherit = FALSE, data = u_inla_df, aes(x=x, y=y), col ='red') + 
+  ggtitle("") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+
+v_plots[[i]] = ggplot(data.frame(samp = v_MCMC[comp[i],-burnins]), aes(samp)) + 
+  geom_histogram(aes(y=..density..), binwidth = binw) + 
+  geom_path(aes.inherit = FALSE, data = v_inla_df, aes(x=x, y=y), col ='red') + 
+  ggtitle("") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
 }
 
+library(gridExtra)
+grid.arrange(grobs = u_plots, ncol = 1)
+grid.arrange(grobs = v_plots, ncol = 1)
+
 ```
+
+
 
 
 
 ```{r}
-
+u_median = INLAOral$summary.random$Region.struct$`0.5quant`
 germany.plot(exp(u_median), col=col, legend=TRUE)
 ```
-**Dette er fortsatt feil**
+
 
 ##b)
 We will now add some explanatory factors for getting oral cancer.
