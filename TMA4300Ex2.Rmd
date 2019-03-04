@@ -201,13 +201,13 @@ starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, ka
 
 ```{r, eval = TRUE}
 #Run function.
-#set.seed(4300)
+set.seed(4300)
 #samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 
 #Save and load, so we don't need to do it over and over again
-save(samples, file = 'MCMCsamples.RData', ascii=TRUE)
+#save(samples, file = 'MCMCsamples.RData', ascii=TRUE)
 load('MCMCsamples.RData')
-M = length(samples$kappa_u)
+#M = length(samples$kappa_u)
 ```
 
 
