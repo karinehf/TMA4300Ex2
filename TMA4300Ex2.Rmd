@@ -45,10 +45,14 @@ load('additionalFiles/tma4300_ex2_Rmatrix.Rdata')
 
 col <- diverge_hcl(8) # blue - red
 # use a function provided by spam to plot the map together with the mortality rates
+```
+
+```{r, fig:germany_y, fig.width=5, fig.height=4, fig.cap="\\label{fig:germany_y} Distribution of cases of oral cancer across regions in Germany."}
+
 germany.plot(Oral$Y/Oral$E, col=col, legend=TRUE)
 
 ```
-The plot above shows the ratio between the observed number of cases of oral cancer and the expected number based on demographics, that is $y_i/E_i$ for all districts in Germany. The general tendency is slightly higher rates than expected in the north east and south west and lower than expect in the mid east.
+Figure \ref{fig:germany_y} shows the ratio between the observed number of cases of oral cancer and the expected number based on demographics, that is $y_i/E_i$ for all districts in Germany. The general tendency is slightly higher rates than expected in the north east and south west and lower than expect in the mid east.
 #Exercise 1: Derivations
 ```{r, child = 'text/task1.Rmd'}
 ```
@@ -171,7 +175,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
 }
 ```
 
-Known values, the number of samples and initial values are set before we run the sampler.
+Known values, the number of samples and initial values are set before we run the sampler. Note that the initial values for the $\kappa$s are not necessary, as they are never used in the sampler. However, they are here given as their prior expected values, which is where we would assume the values to be before any data is obtained.
 ```{r}
 #Set parameters
 M = 50000
@@ -205,25 +209,25 @@ M = length(samples$kappa_u)
 
 
 #Exercise 3: Convergence diagnostics
-We will now do some analysis of the result of the MCMC. First, we will obtain some diagnostic summaries for a set of the parameters. We will try to conclude whether the chain has converged to the target/stationary distribuition.
+We will now do some analysis of the result of the MCMC. First, we will obtain some diagnostic summaries for the parameters. Since we have obtained results for $\kappa_u$, $\kappa_v$, $\boldsymbol u$ and $\boldsymbol\eta$, these are the ones we will analyse. The aim is to try to conclude whether or not the chain has converged to the target/stationary distribuition.
 
 ##a) Trace plots
 First, we look at the trace plots for $\kappa_u$ and $\kappa_v$. 
-Figure **x** shows all samples, including the burn-in period in the beginning. In figure **y** the burn-in period is disregarded, to show the variability in the parameters, and figure **z** shows just a small part of the samples, and the individual steps in the algorithm is more visible here.
-```{r}
+```{r, fig:trace_kappa1, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_kappa1} Trace plots for kappa. First 100 samples. Here, the burn-in-period is clearly visible.", echo = FALSE}
 #x
 #Trace plots Kappa
 start = 1
+stop = 100
 trace.kappa_u = 
-  ggplot(data.frame(kappa = samples$kappa_u[start:M]), aes(x=start:M, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
+  ggplot(data.frame(kappa = samples$kappa_u[start:stop]), aes(x=start:stop, y = kappa)) + geom_line()+ ggtitle("MCMC trace plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + xlab('Iterations') + ylab('kappa_u')
 
 trace.kappa_v = 
-  ggplot(data.frame(kappa = samples$kappa_v[start:M]), aes(x=start:M, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
+  ggplot(data.frame(kappa = samples$kappa_v[start:stop]), aes(x=start:stop, y = kappa)) + geom_line() + xlab('Iterations') + ylab('kappa_v')
 
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
 
-```{r}
+```{r, fig:trace_kappa2, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_kappa2} Trace plots for kappa. Burn-in-period is disregarded.", echo = FALSE}
 #y
 #Trace plots Kappa
 start = 1000
@@ -236,7 +240,7 @@ trace.kappa_v =
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
 
-```{r}
+```{r, fig:trace_kappa3, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_kappa3} Trace plots for kappa. Only 500 samples are shown. This means it is possible to see that the MCMC moves slowly is not mixing very well.", echo = FALSE}
 #z
 #Trace plots Kappa
 start = 1000
@@ -249,8 +253,9 @@ trace.kappa_v =
 
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
+Figure \ref{fig:trace_kappa1} shows the first $100$ samples, so that the burn-in period is displayed. In figure \ref{fig:trace_kappa2} the burn-in period (or actually, the first $1000$ samples) is disregarded, to better show the variability in the parameters in the (hopefully) stationary distribution, and figure \ref{fig:trave_kappa3} shows just a small part of the samples, and the individual steps in the algorithm is more visible here. Note that both $\kappa$s move quite slowly and that the mixing does not seem to be very good. Tt takes quite a lot of steps to explore the whole areas.
 
-**u and eta or u and v??**
+
 Since the vectors of $\boldsymbol\eta$ and $\boldsymbol u$ are of high dimensions, trace plots are only made for a few, randomly chosen components.
 
 ```{r}
@@ -258,6 +263,9 @@ Since the vectors of $\boldsymbol\eta$ and $\boldsymbol u$ are of high dimension
 #Choose components: 
 set.seed(4301)
 comp = ceiling(n*runif(3))
+```
+
+```{r, fig:trace_u, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_u} Trace plots for three components of u.", echo = FALSE}
 trace.u = list()
 trace.eta = list()
 
@@ -281,11 +289,13 @@ trace.eta[[i]] =
 }
 
 trace.u_plot = grid.arrange(grobs = trace.u, ncol = 1)
+```
+
+```{r, fig:trace_eta, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_eta} Trace plots for three components of eta", echo = FALSE}
 trace.eta_plot = grid.arrange(grobs = trace.eta, ncol = 1)
 ```
 
-$\boldsymbol\eta$ and $\boldsymbol u$ seem to have very small burn-in period.
-To be on the safe side, in the further analysis, the first $1000$ samples are disregarded.
+From figures \ref{fig:trace_u} and \ref{fig:trace_eta}, $\boldsymbol\eta$ and $\boldsymbol u$ seem to have very small burn-in periods, if any. To be on the safe side, in the further analysis the first $1000$ samples are disregarded for all parameters.
 ```{r}
 #Define burn-in area
 burnins = 1:1000
@@ -293,10 +303,13 @@ burnins = 1:1000
 
 ##b) Autocorrelation plots
 
-Autocorrelation plots are made for the same components as the trace plots.
+Autocorrelation plots are made for the same components as the trace plots. These tell us how correlated the samples from the MCMC are.
 ```{r}
 acf.kappa_u = acf(samples$kappa_u[-burnins], plot = FALSE)
 acf.kappa_v = acf(samples$kappa_v[-burnins], plot = FALSE)
+```
+
+```{r, fig:acf_kappa, fig.width=5, fig.height=4, fig.cap="\\label{fig:acf_kappa} Autocorrelation function for the two kappas. We see that the steps are highly correlated, escpecially the precision parameter for v.", echo = FALSE}
 
 plot1 = ggplot(data.frame(acf = acf.kappa_u$acf, lag = acf.kappa_u$lag), aes(x = lag, y = acf)) + geom_col(width = 0.2) + ggtitle("ACF plots: Kappa") + theme(plot.title = element_text(hjust = 0.5)) + ylab('acf kappa_u')
 
@@ -305,7 +318,7 @@ plot2 = ggplot(data.frame(acf = acf.kappa_v$acf, lag = acf.kappa_v$lag), aes(x =
 acf.kappa_plot = grid.arrange(grobs = list(plot1, plot2), ncol = 1)
 ```
 
-```{r}
+```{r, fig:acf_u, fig.width=5, fig.height=4, fig.cap="\\label{fig:acf_u} Autocorrelation function for the three u components. The steps are somewhat correlated, but goes towards 0 after about 10-30 steps.", echo = FALSE}
 #acf for u and eta
 plot_u = list()
 plot_eta = list()
@@ -327,13 +340,17 @@ for (i in 2:length(comp)){
 }
 
 acf.u_plot = grid.arrange(grobs = plot_u, ncol = 1)
-acf.eta_plot = grid.arrange(grobs = plot_eta, ncol = 1)
-
 ```
-We see that the steps are quite correlated for the $\kappa$s. From the trace plot in figure **z**, this tendency can be spotted. The mixing does not seem to be very good; the steps are often quite small, so that it takes quite a lot of steps to explore the whole areas.
+
+```{r, fig:acf_eta, fig.width=5, fig.height=4, fig.cap="\\label{fig:acf_eta} Autocorrelation function for the three eta components. The steps are somewhat correlated, but goes towards 0 after about 10-20 steps.", echo = FALSE}
+
+acf.eta_plot = grid.arrange(grobs = plot_eta, ncol = 1)
+```
+
+We see in figure \ref{fig:acf_kappa} that the MCMC steps for $\kappa_u$ and $\kappa_v$ are highly correlated. From the small steps in trace plot in figure \ref{fig:trace_kappa3}, this is not very surprising. Though the components for $\boldsymbol\eta$ and $\boldsymbol u$ also are correlated, these go towards zero a lot faster, as shown in figures \ref{fig:acf_eta} and \ref{fig:acf_u}.
 
 ##Convergence test
-geweke.diag() performs a test for convergence of the markov chain.
+`geweke.diag()` performs a test for convergence of the markov chain.
 It takes one fraction of the beginning of the chain and one fraction of the end of the MCMC. The burn-in period is disregarded. If the chain has converged to the stationary distribution, the two means should be equal. The geweke test statistic is asymptotically standard normal distributed.
 The null hypothesis is that the chain has converged.
 
@@ -376,27 +393,27 @@ cat('eta comp', comp[3], ': test stat', gew.eta$z[comp[3]],' p-value', p_eta[com
 
 ```
 
-We make a histogram of all p-values to see whether they seem to be uniformly distributed, as they would be if the null hypothesis is true and the chain has converged.
-```{r}
+With a significance level of $0.05$, which is often used, we would conclude that $\kappa_v$ has not converges, but that the other components have. This is if we consider each component isolated. However, we are really interested in whether the chain as a whole has converged. To assess this question, we make a histogram of all p-values to see whether they seem to be uniformly distributed, as they would be if the null hypothesis is true and the chain has converged. This is shown in figure \ref{fig:p_vals}
+
+```{r, fig:p_vals, fig.width=5, fig.height=4, fig.cap="\\label{fig:p_vals} P-values for the geweke test on each parameter component. They should ideally be uniformly distributed if the MCMC chain has converged.", echo = FALSE}
 ggplot(data = data.frame(p_vals = c(p_u,p_eta, p_kappa), var = c(rep(1, length = length(p_u)), rep(2,length = length(p_eta)), rep(3, length = length(p_kappa))))) + geom_histogram(aes(x = p_vals, y = ..density..))
 
 ```
 
-**Conclusion?**
-For some components, isolated, we will conclude from the geweke test that the samples have not converged to the target distribution. However, overall, the p-values seem at least not far from uniformly distributed. From the trace plots, it looks like the chain has converged. The autocorrelation plots show quite high correlation for some components, but some correlation cannot be avoided, as the proposed steps depend on the previous steps.
-Al in all, it seems the MCMC has converged, but of course, we cannot be completely sure.
+Overall, the p-values seem at least not far from uniformly distributed, though there might be slightly more low values that one would ideally have if the chain has converged. It should be noted, however, that the geweke test can only give some indication on whether the chain has converged or not. It would be easier to conclude that the chain had not converged if the values were very low, than it is to conclude that it has converged when the values vary. All we can say, is that there are no strong indications against convergence.
+
+From the trace plots, it looks like the chain has converged. The autocorrelation plots show quite high correlation for some components, but some correlation cannot be avoided, as the proposed steps depend on the previous steps.
+All in all, it seems the MCMC has converged, but of course, we cannot be completely sure. There might some unforeseen features that are not captured by the algorithm.
 
 #Exercise 4: Effective sample set
 
+Now we compute the effective sample size for the $\kappa$s.
 ```{r}
-effSize.kappa_u = effectiveSize(samples$kappa_u[-burnins])
-effSize.kappa_v = effectiveSize(samples$kappa_v[-burnins])
+effSize.kappa_u = effectiveSize(samples$kappa_u[-burnins]); effSize.kappa_u
+effSize.kappa_v = effectiveSize(samples$kappa_v[-burnins]); effSize.kappa_v
 ```
 
-**interpret the values**
-These values mean that out of the $M$ samples of the MCMC, we "effectively" have $939$ and $348$ samples from the posterior distributions of $\kappa_u$ and $\kappa_v$, respectively. These are **very low!** values.**??**
-
-**How could the MCMC be changed to increas the effective sample size?**
+These values mean that out of the $M$ samples of the MCMC, we "effectively" have $939$ and $348$ samples from the posterior distributions of $\kappa_u$ and $\kappa_v$, respectively. These are quite low values, but as we have seen in the trace plots and acf, these MCMC chains move very slowly. To increase the effective sample size, we should try to make the algorithm more efficient and improve the mixing. One idea could be to perform block updates, where $\kappa_v$ and $\boldsymbol\eta$ were updated at the same time instead of sequentially.
 
 ```{r}
 comp_time = as.numeric(samples$time)
@@ -409,26 +426,26 @@ relEffSize.kappa_v= effSize.kappa_v/comp_time
 cat('Relative effective sample size for kappa_u is ', relEffSize.kappa_u, '\n')
 cat('Relative effective sample size for kappa_v is ', relEffSize.kappa_v, '\n')
 ```
-The relaive effective sample size is the effective sample size obtained per second of running the MCMC. This could be interesting, as it gives us some meaure of how efficient the MCMC algorithm is. Low computer time is not good in itself if the algorithm does not draw enough samples from the target distribution. Likewise, large effective sample size is of course desireble, but if the algorithm has to run for an unreasonable long time, some improvement of the algorithm or sampling approach should maybe be considered. 
 
-These numbers in themselves might not be too informative, but in relation to other approaches, they will give some measure of which to use.
+The relative effective sample size is the effective sample size obtained per second of running the MCMC. This could be interesting, as it gives us some meaure of how efficient the MCMC algorithm is. Low computer time is not good in itself if the algorithm does not draw enough samples from the target distribution. Likewise, large effective sample size is of course desireble, but if the algorithm has to run for an unreasonable long time, some improvement of the algorithm or sampling approach should maybe be considered. 
+
+These numbers in themselves might not be too informative, as they will depend on e.g. the computer, but in relation to other approaches for implementing the MCMC, they will give some measure of which to use. Still, it can be seen that relative effective sample sizes for the $\kappa$_s, in particular $\kappa_v$ are quite small, as the preceding analysis would indicate.
 
 #Exercise 5: Interpretation of result
-**u or eta?**
 
-```{r}
+
+```{r, fig:germany_MCMC, fig.width=5, fig.height=4, fig.cap="\\label{fig:germany_MCMC} Posterior spatial dependency (exp(u)) of cases of oral cancer accross regions in Germany."}
 post_median = exp(apply(samples$u, 1, median))
 
 germany.plot(post_median, col=col, legend=TRUE)
 ```
 
-We see that the general tendencies from the data ($y_i/E_i$) in the beginning of the report are still present in this posterior distribution, but that the posterior distribution of the expected number of cancers per region is smoother across region. **meeeh**
-
+We see that the general tendencies from figure \ref{fig:germany_y} in the beginning of the report are also present in figure \ref{fig:germany_MCMC}, but that the values are a lot smoother accross regions. Figure \ref{fig:germany_MCMC} shows exp(median) of the posterior distribution for spatial correlation in number of oral cancer cases. We do not have any explanatory variables in our model. This means that the figure shows what would be the expected number of cancer cases accross regions (divided by the expected number of cases for demographic reasons, $E_i$) if there were no noise present. 
 
 #Exercise 6: INLA
 
 ##a)
-R-INLA can also be used to approximate oral cancer in Germany.
+R-INLA can also be used to estimate oral cancer across regions in Germany. First, we 
 ```{r}
 #Build the same model using INLA
 library(INLA)
