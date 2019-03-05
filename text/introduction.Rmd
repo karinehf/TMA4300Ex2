@@ -3,7 +3,7 @@ title: ''
 output: pdf_document
 ---
 
-The goal of this project is to study the distribution of oral cancer in Germany. We will mainly study this problem through the lens of a spatial Bayesian model, byt we will also briefly discuss the effects of smoking. Our data set is composed of the number of lip cancer patients in each district of Germany. We will assume that the number of cases are conditionally independent Poisson distrubuted variables. That is
+The goal of this project is to study the distribution of oral cancer in Germany. We will mainly study this problem through the lens of a spatial Bayesian model, but we will also briefly discuss the effects of smoking. Our data set is composed of the number of lip cancer patients in each district of Germany. We will assume that the number of cases are conditionally independent Poisson distrubuted variables. That is
 $$
 y_i|\eta_i\sim\text{Pois}(E_ie^{\eta_i}), \qquad i =1,...,n,
 $$
@@ -11,14 +11,14 @@ where $y_i$ is the number of cases in district $i$, $E_i$ is an expected number 
 $$
 \text{p}(\boldsymbol{u}|\kappa_u)\propto\kappa_u^{(n-1)/2}\exp\left\{-\frac{\kappa_u}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u}\right\}.
 $$
-Here $\textbf{R}$ is a neighbour matrix with $n_i$, the number of neighbour districts to district $i$, on the diagonal, $-1$ if district $i$ and $j$ are neighbours and zero otherwise. This will be a sparse non-negaitve definit matrix, and is therefore a possible precision matrix. The conditional distribution of $\boldsymbol{\eta}$ is then
+Here $\textbf{R}$ is a neighbour matrix with $n_i$, the number of neighbour districts to district $i$, on the diagonal, $-1$ if district $i$ and $j$ are neighbours and zero otherwise. This will be a sparse non-negaitve definite matrix, and is therefore a possible precision matrix. The conditional distribution of $\boldsymbol{\eta}$ is then
 $$
 \boldsymbol{\eta}|\boldsymbol{u},\kappa_v\sim N(\boldsymbol{u},\kappa_v^{-1}\textbf{I})
 $$
 $\kappa_u$ and $\kappa_v$ are the hyperparameters of the problem, and both precisions parameters are assumed to be gamma distributed. That is
-$$
-\kappa_u\sim\text{Gamma}(\alpha_u,\beta_u)\\
-\kappa_v\sim\text{Gamma}(\alpha_v,\beta_v).
-$$
+\begin{align*}
+&\kappa_u\sim\text{Gamma}(\alpha_u,\beta_u)\\
+&\kappa_v\sim\text{Gamma}(\alpha_v,\beta_v).
+\end{align*}
 We are going to assume $\alpha_u=\alpha_v=1$ and $\beta_u=\beta_v=0.01$. In order to study this spatial structure, we will implement a Gibbs sampler with a Metropolis-Hastings step to sample from the full posterior distribution.
 

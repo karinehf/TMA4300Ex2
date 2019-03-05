@@ -4,15 +4,8 @@ author: "Karine H. Foss & August S. Mathisen"
 date: "18 2 2019"
 output: pdf_document
 ---
-Comments: 
 
-*  Need to explain better what $q(\eta)$ is. This is proposal distribution?
-*  Which elements in the canonical form of mvnorm are the precision matrix etc?
-*  ex3: says u and v in text; should be eta?
-*  ex3: should we remove burn-in period before performing test? (and acf?)
-*  ex5: says exp(u), but should be eta??
-
-
+#Introduction
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(echo = TRUE)
 library(formatR)
@@ -39,26 +32,23 @@ library(ggplot2)
 library(gridExtra)
 library(spam) # load the data
 str(Oral) # see structure of data
-#???data.frame???: 544 obs. of 3 variables:
-# $ Y : int 18 62 44 12 18 27 20 29 39 21 . . .
-# $ E : num 16.4 45.9 44.7 16.3 26.9 . . .
-# $ SMR: num 1.101 1.351 0.985 0.735 0.668 . . .
 attach(Oral) # allow direct referencing to Y and E
+
 # load some libraries to generate nice map plots
 library(fields, warn.conflict=FALSE)
 library(colorspace)
-source('additionalFiles/dmvnorm.R')
 
+#Load the file with a function for evaluating multivariate normal densities parameterized on canonical form
+source('additionalFiles/dmvnorm.R')
+#Load the matrix that describes which districts in Germany that lie close to one another
+load('additionalFiles/tma4300_ex2_Rmatrix.Rdata')
 
 col <- diverge_hcl(8) # blue - red
 # use a function provided by spam to plot the map together with the mortality rates
 germany.plot(Oral$Y/Oral$E, col=col, legend=TRUE)
-load('additionalFiles/tma4300_ex2_Rmatrix.Rdata')
 
-#Set seed so that the task can be reproduced
-set.seed(42)
 ```
-
+The plot above shows the ratio between the observed number of cases of oral cancer and the expected number based on demographics, that is $y_i/E_i$ for all districts in Germany. The general tendency is slightly higher rates than expected in the north east and south west and lower than expect in the mid east.
 #Exercise 1: Derivations
 ```{r, child = 'text/task1.Rmd'}
 ```
@@ -70,41 +60,41 @@ set.seed(42)
 ```{r}
 #Define functions to be used in the MCMC
 
-#The c-function from the 
+#The c-function from the Taylor expansion of f in task 1b)
 c_func = function(z, E){
   exp(z)*E
 }
 
+#The b-function from the Taylor expansion of f in task 1b)
 b_func = function(z, y, E){
   y + c_func(z,E)*(z-1)
 }
 
+#A function that draws from the full conditional of kappa_u at a given MCMC step
 drawKappaU = function(n, alpha_u, beta_u, u, R){
-  rgamma(1, shape = (n-1)/2+alpha_u, rate = beta_u + 0.5*t(u)%*%R%*%u)
+  rgamma(1, shape = (n-1)/2 + alpha_u, rate = beta_u + 0.5*t(u)%*%R%*%u)
 }
 
+#A function that draws from the full conditional of kappa_v at a given MCMC step
 drawKappaV = function(n, alpha_v, beta_v, eta, u){
   rgamma(1, shape = n/2+alpha_v, rate = beta_v+0.5*sum((eta-u)^2))
 }
 
+#A function that draws from the full conditional of u at a given MCMC step
 drawU = function(n, kappa_u, kappa_v, eta, R){
   t(rmvnorm.canonical(1, kappa_v*eta, kappa_u*R+diag.spam(kappa_v, n, n)))
 }
 
+#A function that draws from an approximation to the full conditional of eta at a given MCMC step. It is a multivariate normal approximation around z.
 drawEta = function(n, z, y, kappa_v, kappa_u, u, E){
   t(rmvnorm.canonical(1, kappa_v*u + b_func(z,y,E), diag.spam(as.vector(c_func(z,E)))+ diag.spam(kappa_v, n, n)))
 }
 
+#A function that calculate the logarithm of the full conditional of eta up to a normalisation constant. It is used for calculating the acceptance probability.
 logFullCondEta = function(eta, kappa_v, u, y, E){
   -kappa_v*0.5*t(eta)%*%eta+t(eta)%*%u*kappa_v + t(eta)%*%y-t(exp(eta))%*%E
 }
 
-#Not in use anymore:
-calculateLogAcceptanceProb = function(etaProp, etaPrev, kappa_v, E){
-  c_prop = c_func(etaProp, E)
-  c_prev = c_func(etaPrev, E)
-  logProb = (sum(log(kappa_v+c_prop))-sum(log(kappa_v+c_prev)))/2+t(c_prev*etaProp)%*%(0.5*etaProp-etaPrev)-t(c_prop*etaPrev)%*%(0.5*etaPrev-etaProp)+sum(c_prev)-sum(c_prop)+t(etaProp)%*%c_prev-t(etaPrev)%*%c_prop
-}
 
 ```
 
@@ -129,6 +119,7 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
   kappa_u_vals = vector(length = M)
   kappa_v_vals = vector(length = M)
   
+  #Put the starting values in the first column of the matrices and vectors
   eta_values[,1] = eta_prev
   u_values[,1] = u
   kappa_v_vals[1] = kappa_v
@@ -146,22 +137,23 @@ MCMCOral = function(M, y, starting_values, alpha_u, beta_u, alpha_v, beta_v, E, 
     #prpose eta
     eta = drawEta(n, eta_prev, y, kappa_v, kappa_u, u, E)
     
-    #generate acceptance variable
+    #generate a random number to determine wether to accept or reject
     decision_var = runif(1)
     
-    #check for acceptance
-    #log_acceptance = calculateLogAcceptanceProb(eta, eta_prev, kappa_v, E)
+    #Calculate the different terms that go into the expression for the acceptance probability
     p_eta = logFullCondEta(eta, kappa_v, u, y, E)
     p_eta_prev = logFullCondEta(eta_prev, kappa_v, u, y, E)
     q_eta = dmvnorm.canonical(eta, kappa_v*u + b_func(eta_prev,y,E), diag.spam(as.vector(c_func(eta_prev,E)+kappa_v)), log=TRUE)
     q_eta_prev = dmvnorm.canonical(eta_prev, kappa_v*u + b_func(eta,y,E), diag.spam(as.vector(c_func(eta,E))+kappa_v), log=TRUE)
+    
+    #Calculate the logarithm of the acceptance probability
     log_acceptance = p_eta-p_eta_prev+q_eta_prev-q_eta
     
     
     #Using log_acceptance further
     acceptance_rates[i] = min(1, exp(log_acceptance))
     
-    #Changed from log_acceptance to acceptance_rates[i]:
+    #Determine wether to accept or reject
     if(decision_var<acceptance_rates[i]){
       eta_prev = eta
       num_accepted = num_accepted +1
@@ -201,6 +193,7 @@ starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, ka
 
 ```{r, eval = TRUE}
 #Run function.
+
 #set.seed(4300)
 #samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 
@@ -619,6 +612,6 @@ ggplot(data = smoking_df, aes(x = index)) +
   theme(plot.title = element_text(hjust = 0.5))
   
 ```
-
+According to the DIC criterion the best model for our data is the one with a linear smoking effect. The difference between it and the model with a non-linear smoking effect is on the other hand minimal, and the model without a smoking effect is also close behind. The plot of the non-linear effect justifies this as it shows a clear trend from low smoking levels to high smoking levels. The effect is however close to linear, which means that the linear model will have similar predictions. In addition, zero is always contained in the $95\%$ credible interval which means that a model without an effect of smoking will also stay close to the models which accounts for it.
 
 
