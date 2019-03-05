@@ -4,7 +4,7 @@ output: pdf_document
 ---
 ##a)
 
-From the definition of conditional probability and the nature of the assumptions in this project, we know that the full conditional distribtuion has the form
+From the definition of conditional probability and the nature of the assumptions in this project, we know that the full conditional distribution has the form
 \begin{align*}
 \text{p}(\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v|\boldsymbol{y})&\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u,\kappa_v)\text{p}(\kappa_u\,|\kappa_v)\text{p}(\kappa_v)\\
 &\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta})\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u)\text{p}(\kappa_u)\text{p}(\kappa_v).
@@ -17,7 +17,7 @@ By inserting the corresponding probabilities, this becomes
 
 ##b)
 
-The sum over $e^{\eta_i}$ in the posterior means that the full conditional of $\eta_i$ is difficult to sample from. We therefore want to approximate the distribution of $\boldsymbol{\eta}$ it with a multivariate normal in order to use Metropolis-Hastings steps for it. We define the function
+The sum over $e^{\eta_i}$ in the posterior means that the full conditional of $\eta_i$ is difficult to sample from. We therefore want to approximate the full conditional distribution of $\boldsymbol{\eta}$ it with a multivariate normal in order to use Metropolis-Hastings steps for it. We define the function
 $$
 f(\eta_i)=y_i\eta_i-E_ie^{\eta_i},
 $$
@@ -34,8 +34,13 @@ This yeilds the following Taylor series expansion of $f$ around $z_i$,
 where $a(z_i)=E_ie^{z_i}(z_i-z_i^2/2-1)$, $b(z_i) = y_i+E_ie^{z_i}(z_i-1)$ and $c(z_i) = E_ie^{z_i}$.
 
 ##c)
-
-As $\text{p}(\theta_i|\boldsymbol{\theta}_{\backslash i},\boldsymbol{y})\propto\text{p}(\boldsymbol{\theta}|\boldsymbol{y})$, we can quite easily find the full conditionals from the posterior. Using this, we see that
+From the definition of conditional probability, we know that the full conditional density of a parameter $\theta_i$ is
+$$
+\text{p}(\theta_i|\boldsymbol{\theta}_{- i},\boldsymbol{y})=
+\frac{\text{p}(\boldsymbol{\theta},\boldsymbol{y})}{\text{p}(\boldsymbol{\theta}_{-i},\boldsymbol{y})}=
+\frac{\text{p}(\boldsymbol{\theta}|\boldsymbol{y})\cdot \text p(\boldsymbol{y})}{\text{p}(\boldsymbol{\theta}_{-i},\boldsymbol{y})}\propto\text p(\boldsymbol{\theta}|\boldsymbol{y})
+$$
+This means that the full condtional distribution of any parameter is proportional to the joint posterior distribution, and we can therefore find the full conditionals from the joint posterior. Using this, we see that
 $$
 \text{p}(\kappa_u|\boldsymbol{y},\kappa_v,\boldsymbol{\eta},\boldsymbol{u})\propto\kappa_u^{(n-1)/2+\alpha_u-1}e^{-(\beta_u+\frac{1}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u})\kappa_u}.
 $$
@@ -56,7 +61,7 @@ This does not correspond to any standard distribution, but by applying the appro
 \text{q}(\boldsymbol\eta|\boldsymbol{z},\boldsymbol{y},\boldsymbol{u},\kappa_u,\kappa_v)&\propto\exp\left\{-\frac{\kappa_v}{2}\boldsymbol{\eta}^T\boldsymbol{\eta}+\kappa_v\boldsymbol{\eta}^T\boldsymbol{u}-\frac{1}{2}\boldsymbol{\eta}^T\text{diag}(c(\boldsymbol{z}))\boldsymbol{\eta}+\boldsymbol{\eta}^Tb(\boldsymbol{z})\right\}\\
 &=\exp\left\{-\frac{1}{2}\boldsymbol{\eta}^T\Big(\kappa_v\textbf{I}+\text{diag}(c(\boldsymbol{z}))\Big)\boldsymbol{\eta}+\boldsymbol{\eta}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{z}))\right\},
 \end{align*}
-where $\boldsymbol{z}=[z_1,...,z_n]^T$ is the point around which we Taylor expand $f$, $b(\boldsymbol{z})=[b(z_1),...,b(z_n)]^T$ and $c(\boldsymbol{z})=[c(z_1),...,c(z_n)]^T$. $\text{q}$ is the canonical form of a multivariate normal distribution, and can be used for Metropolis-Hastings steps for $\boldsymbol{\eta}$.
+where $\boldsymbol{z}=[z_1,...,z_n]^T$ is the point around which we Taylor expand $f$, $b(\boldsymbol{z})=[b(z_1),...,b(z_n)]^T$ and $c(\boldsymbol{z})=[c(z_1),...,c(z_n)]^T$. $\text{q}$ is the canonical form of a multivariate normal distribution, and can be used as the proposal density for Metropolis-Hastings steps for $\boldsymbol{\eta}$.
 
 
 

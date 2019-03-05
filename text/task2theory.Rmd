@@ -7,26 +7,20 @@ output: pdf_document
 
 
 
-Before we can implement the Metropolis-Hastings part of the sampler, we need to simplfy the expression for the acceptance propability $\alpha$. If we first consider the ratio between true the full conditionals of $\boldsymbol{\eta^*}$ and $\boldsymbol{\eta}$ we can simply insert into the expression found in 1c)
+Before we can implement the Metropolis-Hastings part of the sampler, we need to simplfy the expression for the acceptance propability $\alpha$ given by
+$$
+\alpha = \min \left\{1, \frac{\text{p}(\boldsymbol{\eta^*}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{p}(\boldsymbol{\eta}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}\cdot\frac{\text{q}(\boldsymbol{\eta}|\boldsymbol{\eta^*},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{q}(\boldsymbol{\eta^*}|\boldsymbol{\eta},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}\right\}
+$$
+
+Here $\boldsymbol{\eta^*}$ is the proposed $m$'th step, $\boldsymbol{\eta}$ the value of the $(m-1)$'th step while $\boldsymbol{u}$, $\kappa_u$ and $\kappa_v$ are the $m$'th step values. If we first consider the ratio between the full conditionals, the expression found in 1c) gives
 $$
 \frac{\text{p}(\boldsymbol{\eta^*}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{p}(\boldsymbol{\eta}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}=
 \exp\left\{-\frac{\kappa_v}{2}\boldsymbol{\eta^*}^T\boldsymbol{\eta^*}+\boldsymbol{\eta^*}^T(\kappa_v\boldsymbol{u}+\boldsymbol{y})-\exp(\boldsymbol{\eta^*})^T\mathbf{E}+\frac{\kappa_v}{2}\boldsymbol{\eta}^T\boldsymbol{\eta}-\boldsymbol{\eta}^T(\kappa_v\boldsymbol{u}+\boldsymbol{y})+\exp(\boldsymbol{\eta})^T\mathbf{E}\right\}.
 $$
-Here $\boldsymbol{\eta^*}$ is the proposed $m$'th step, $\boldsymbol{\eta}$ the value of the $(m-1)$'th step while $\boldsymbol{u}$, $\kappa_u$ and $\kappa_v$ are the $m$'th step values. The ratio between the proposal distributions is possible to calculate using the function `dmvnorm.canonical()`. Checking for acceptance therefore consists of evaluating the log of the above equation, finding the values for q from `dmvnorm.canonical()` and then cheking wether the log of your decision variable is smaller than the resulting quantity. 
+ The ratio between the proposal distributions is possible to calculate using the function `dmvnorm.canonical()` provided in the addtional files for the exercise. Checking for acceptance therefore consists of three steps. First evaluate the logarithm of the above expression to find $\ln(\text{p}(\boldsymbol{\eta^*}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)/\text{p}(\boldsymbol{\eta}|\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v))$. Then  find the logarithm of the ratio between the two proposal distributions using `dmvnorm.canonical()`. At last add the two quantities to find $\ln\alpha$. We operate on log scale here in order to avoid numbers too large for our machine to handle.
 
+If one looks closer at the expressions for the full conditionals and the proposal densities, we can see that several terms cancel. This means that the acceptance probabilities can be calculated even more efficiently by writing out the full expression for $\alpha$ and cancel all possible terms. This is however tedious work, and our initial attempts failed due to some error in our derivation or implemetation of the function. However, if one wanted many more samples, this should be examined further.
 
-
-
-(this is cute and all, but probably belongs in an appendix as it is not used)
-
-The ratio between the proposal distributions can also be found by insertion
-\begin{align*}
-\frac{\text{q}(\boldsymbol{\eta}|\boldsymbol{\eta^*},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}{\text{q}(\boldsymbol{\eta^*}|\boldsymbol{\eta},\boldsymbol{y},\boldsymbol{u},\kappa_u, \kappa_v)}=& \frac{\Big|\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta^*}))\Big|^\frac{1}{2}}{\Big|\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta}))\Big|^\frac{1}{2}}\cdot \\ &\exp\Big\{-\frac{1}{2}\boldsymbol{\eta}^T\Big(\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta^*}))\Big)\boldsymbol{\eta}+\boldsymbol{\eta}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{\eta^*}))+\\ &\frac{1}{2}\boldsymbol{\eta^*}^T\Big(\kappa_v\text{I}+\text{diag}(c(\boldsymbol{\eta}))\Big)\boldsymbol{\eta^*}-\boldsymbol{\eta^*}^T(\kappa_u\boldsymbol{u}+b(\boldsymbol{\eta}))\Big\}.
-\end{align*}
-(dette er stygt, men jeg vet ikke hvordan det kan bli penere). Multiplying these two ratios and using the fact that $b(\boldsymbol{z})=\boldsymbol{y}+\text{diag}(c(\boldsymbol{z}))\boldsymbol{z}-c(\boldsymbol{z})$ and that $\Sigma c(\boldsymbol{z}) = \exp(\boldsymbol{z})^T\mathbf{E}$, we get
-$$
-\alpha = \min\left\{1, \frac{\prod_i(\kappa_v+c(\eta^*_i))}{\prod_i(\kappa_v+c(\eta_i))}\exp\left[c(\boldsymbol{\eta})^T\Big(\text{diag}(\boldsymbol{\eta^*})(\frac{1}{2}\boldsymbol{\eta^*}-\boldsymbol{\eta})+\vec{1}\Big)-c(\boldsymbol{\eta^*})^T\Big(\text{diag}(\boldsymbol{\eta})(\frac{1}{2}\boldsymbol{\eta}-\boldsymbol{\eta^*})+\vec{1}\Big)\right]\right\}
-$$
 
 
 
