@@ -70,7 +70,7 @@ set.seed(42)
 ```{r}
 #Define functions to be used in the MCMC
 
-#Changed from z to exp(z) here
+#The c-function from the 
 c_func = function(z, E){
   exp(z)*E
 }
@@ -201,13 +201,13 @@ starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, ka
 
 ```{r, eval = TRUE}
 #Run function.
-set.seed(4300)
+#set.seed(4300)
 #samples = MCMCOral(M,y,starting_values,alpha_u,beta_u,alpha_v,beta_v,E,R)
 
 #Save and load, so we don't need to do it over and over again
 #save(samples, file = 'MCMCsamples.RData', ascii=TRUE)
 load('MCMCsamples.RData')
-#M = length(samples$kappa_u)
+M = length(samples$kappa_u)
 ```
 
 
@@ -258,7 +258,7 @@ trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol
 ```
 
 **u and eta or u and v??**
-Since the vectors of $\boldsymbol\eta$ and $\boldsymbol\u$ are of high dimensions, trace plots are only made for a few, randomly chosen components.
+Since the vectors of $\boldsymbol\eta$ and $\boldsymbol u$ are of high dimensions, trace plots are only made for a few, randomly chosen components.
 
 ```{r}
 #Trace plots somecomponents of u and eta
@@ -291,7 +291,7 @@ trace.u_plot = grid.arrange(grobs = trace.u, ncol = 1)
 trace.eta_plot = grid.arrange(grobs = trace.eta, ncol = 1)
 ```
 
-$\boldsymbol\eta$ and $\boldsymbol\u$ seem to have very small burn-in period.
+$\boldsymbol\eta$ and $\boldsymbol u$ seem to have very small burn-in period.
 To be on the safe side, in the further analysis, the first $1000$ samples are disregarded.
 ```{r}
 #Define burn-in area
@@ -555,24 +555,70 @@ OralData["smoking"] = smoking
 
 ```{r}
 
-INLAOSmoking1 = inla(
-  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(param=c(alpha_v,beta_v))))-1 + smoking, 
+INLASmoking1 = inla(
+  formula = Y ~ 
+    f(Region.struct, model = "besag", graph = g, 
+      hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", 
+      hyper = list(prec=list(param=c(alpha_v,beta_v)))) +
+    smoking - 1, 
  family = "poisson",
  E=E,
- data = OralData
+ data = OralData,
+ control.compute = list(dic=TRUE)
 )
 
 ```
 
 ```{r}
-
+#Constr = FALSE?
 INLASmoking2 = inla(
-  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v)))) + f(smoking, model = 'rw2', hyper = list(prec = list(prior = "loggamma")), constr = FALSE)-1, 
+  formula = Y ~ -1 +
+    f(Region.struct, model = "besag", graph = g, 
+      hyper = list(prec=list(param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", 
+      hyper = list(prec=list(prior="loggamma", param=c(alpha_v,beta_v)))) + 
+    f(smoking, model = 'rw2', 
+      hyper = list(prec = list(prior = "loggamma")), constr = FALSE), 
  family = "poisson",
  E=E,
- data = OralData
+ data = OralData,
+ control.compute = list(dic=TRUE)
 )
 ```
+
+```{r}
+#Finding the DICs
+DIC_spatial = INLAOral$dic$dic
+DIC_smoking_linear = INLASmoking1$dic$dic
+DIC_smoking_rw2 = INLASmoking2$dic$dic
+```
+
+```{r, echo=FALSE}
+cat('DIC for the pure spatial model:', DIC_spatial,'\n')
+cat('DIC for the linear smoking effect model:', DIC_smoking_linear,'\n')
+cat('DIC for the rw2 smoking model:', DIC_smoking_rw2)
+```
+
+
+```{r}
+summary_smoking = INLASmoking2$summary.random$smoking
+median_smoking = summary_smoking$`0.5quant`
+lower_quant_smoking = summary_smoking$`0.025quant`
+upper_quant_smoking = summary_smoking$`0.975quant`
+ID_smoking= summary_smoking$ID
+
+smoking_df = data.frame(index = ID_smoking, median = median_smoking, lower = lower_quant_smoking, upper = upper_quant_smoking)
+
+ggplot(data = smoking_df, aes(x = index)) + 
+  geom_path(aes(y = median), col = 'red') + 
+  geom_path(aes(y = lower)) +
+  geom_path(aes(y = upper)) +
+  xlab('smoking ID') + ylab('effect of smoking') +
+  ggtitle("Non-linear smoking effect") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+
+
 
