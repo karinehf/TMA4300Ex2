@@ -1,7 +1,7 @@
 ---
 title: "TMA4300Ex2"
 author: "Karine H. Foss & August S. Mathisen"
-date: "18 2 2019"
+date: "15 3 2019"
 output: pdf_document
 ---
 
@@ -30,6 +30,7 @@ opts_chunk$set(tidy.opts = list(width.cutoff = 68), tidy = TRUE, warning = FALSE
 #Loading libraries
 library(ggplot2)
 library(gridExtra)
+library(coda) #For effectiveSize
 library(spam) # load the data
 str(Oral) # see structure of data
 attach(Oral) # allow direct referencing to Y and E
@@ -195,7 +196,7 @@ kappa_v_start = 100
 starting_values = list(eta = eta_start, u = u_start, kappa_u = kappa_u_start, kappa_v = kappa_v_start)
 ```
 
-```{r, eval = TRUE}
+```{r, eval = TRUE, cache = TRUE}
 #Run function.
 
 #set.seed(4300)
@@ -213,6 +214,7 @@ We will now do some analysis of the result of the MCMC. First, we will obtain so
 
 ##a) Trace plots
 First, we look at the trace plots for $\kappa_u$ and $\kappa_v$. 
+
 ```{r, fig:trace_kappa1, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_kappa1} Trace plots for kappa. First 100 samples. Here, the burn-in-period is clearly visible.", echo = FALSE}
 #x
 #Trace plots Kappa
@@ -227,6 +229,7 @@ trace.kappa_v =
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
 
+
 ```{r, fig:trace_kappa2, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_kappa2} Trace plots for kappa. Burn-in-period is disregarded.", echo = FALSE}
 #y
 #Trace plots Kappa
@@ -239,6 +242,7 @@ trace.kappa_v =
 
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
+
 
 ```{r, fig:trace_kappa3, fig.width=5, fig.height=4, fig.cap="\\label{fig:trace_kappa3} Trace plots for kappa. Only 500 samples are shown. This means it is possible to see that the MCMC moves slowly is not mixing very well.", echo = FALSE}
 #z
@@ -253,6 +257,8 @@ trace.kappa_v =
 
 trace.kappa_plot = grid.arrange(grobs = list(trace.kappa_u, trace.kappa_v), ncol = 1)
 ```
+
+
 Figure \ref{fig:trace_kappa1} shows the first $100$ samples, so that the burn-in period is displayed. In figure \ref{fig:trace_kappa2} the burn-in period (or actually, the first $1000$ samples) is disregarded, to better show the variability in the parameters in the (hopefully) stationary distribution, and figure \ref{fig:trave_kappa3} shows just a small part of the samples, and the individual steps in the algorithm is more visible here. Note that both $\kappa$s move quite slowly and that the mixing does not seem to be very good. Tt takes quite a lot of steps to explore the whole areas.
 
 
@@ -354,8 +360,7 @@ We see in figure \ref{fig:acf_kappa} that the MCMC steps for $\kappa_u$ and $\ka
 It takes one fraction of the beginning of the chain and one fraction of the end of the MCMC. The burn-in period is disregarded. If the chain has converged to the stationary distribution, the two means should be equal. The geweke test statistic is asymptotically standard normal distributed.
 The null hypothesis is that the chain has converged.
 
-```{r}
-library(coda)
+```{r, cache = TRUE}
 
 #Make data frame of samples
 u_df = as.data.frame(t(samples$u))
@@ -434,18 +439,18 @@ These numbers in themselves might not be too informative, as they will depend on
 #Exercise 5: Interpretation of result
 
 
-```{r, fig:germany_MCMC, fig.width=5, fig.height=4, fig.cap="\\label{fig:germany_MCMC} Posterior spatial dependency (exp(u)) of cases of oral cancer accross regions in Germany."}
+```{r, fig:germany_MCMC, fig.width=5, fig.height=4, fig.cap="\\label{fig:germany_MCMC} Posterior spatial dependency (exp(u)) of cases of oral cancer accross regions in Germany, obtained by MCMC."}
 post_median = exp(apply(samples$u, 1, median))
 
 germany.plot(post_median, col=col, legend=TRUE)
 ```
 
-We see that the general tendencies from figure \ref{fig:germany_y} in the beginning of the report are also present in figure \ref{fig:germany_MCMC}, but that the values are a lot smoother accross regions. Figure \ref{fig:germany_MCMC} shows exp(median) of the posterior distribution for spatial correlation in number of oral cancer cases. We do not have any explanatory variables in our model. This means that the figure shows what would be the expected number of cancer cases accross regions (divided by the expected number of cases for demographic reasons, $E_i$) if there were no noise present. 
+We see that the general tendencies from figure \ref{fig:germany_y} in the beginning of the report are also present in figure \ref{fig:germany_MCMC}, but that the values are a lot smoother accross regions. Figure \ref{fig:germany_MCMC} shows exp(median) of the posterior distribution for spatial correlation in number of oral cancer cases. We do not have any explanatory variables in our model, and the noise has expected value $0$. This means that the figure shows the posterior median of cancer cases accross regions divided by the expected number of cases for demographic reasons, $E_i$. 
 
 #Exercise 6: INLA
 
 ##a)
-R-INLA can also be used to estimate oral cancer across regions in Germany. First, we 
+R-INLA can also be used to estimate oral cancer across regions in Germany. First, we implement the same model as for the MCMC.
 ```{r}
 #Build the same model using INLA
 library(INLA)
@@ -464,8 +469,11 @@ OralData = cbind(Oral, Region = Germany$region, Region.struct = Germany$region)
 
 ```{r}
 INLAOral = inla(
-  formula = Y ~ f(Region.struct, model = "besag", graph = g, hyper = list(prec=list(param=c(alpha_u,beta_u))), constr = FALSE) + 
-    f(Region, model = "iid", hyper = list(prec=list(param=c(alpha_v,beta_v))))-1, 
+  formula = Y ~ -1 +
+    f(Region.struct, model = "besag", graph = g, 
+      hyper = list(prec=list(param=c(alpha_u,beta_u))), constr = FALSE) + 
+    f(Region, model = "iid", 
+      hyper = list(prec=list(param=c(alpha_v,beta_v)))), 
  family = "poisson",
  E=E,
  data = OralData,
@@ -474,32 +482,45 @@ INLAOral = inla(
 
 ```
 
+We compare the marginal distributions obtained by `inla()` to histograms for MCMC samples of the corresponding parameters. 
+
 ```{r}
 #Marginal posteriors and histograms
 kappa_u_marginal = INLAOral$marginals.hyperpar$`Precision for Region.struct`
 kappa_v_marginal = INLAOral$marginals.hyperpar$`Precision for Region`
+```
 
+
+```{r, fig:kappa_inla, fig.width=5, fig.height=4, fig.cap="\\label{fig:kappa_inla} Posterior marginals from the estimation by INLA and corresponding histograms obtained by MCMC", echo = FALSE}
 kappa_u_df = as.data.frame(kappa_u_marginal[-(74:75),])
 kappa_v_df = as.data.frame(kappa_v_marginal[-(70:75),])
+kappa_marginals_plot = list()
 
-ggplot(data.frame(kappa = samples$kappa_u[-burnins]), aes(kappa)) + 
+kappa_marginals_plot[[1]] = ggplot(data.frame(kappa = samples$kappa_u[-burnins]), aes(kappa)) + 
   geom_histogram(aes(y=..density..), binwidth = 0.5,boundary = 0) + 
   geom_path(aes.inherit = FALSE, data = kappa_u_df, aes(x=x, y=y), col ='red') + 
-  ggtitle("") +
- theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+  ggtitle("Posterior marginals: kappa_u") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('kappa_u')
 
 
-ggplot(data.frame(kappa = samples$kappa_v[-burnins]), aes(kappa)) + 
+kappa_marginals_plot[[2]] =ggplot(data.frame(kappa = samples$kappa_v[-burnins]), aes(kappa)) + 
   geom_histogram(aes(y=..density..), binwidth = 10,boundary = 0) + 
   geom_path(aes.inherit = FALSE, data = kappa_v_df, aes(x=x, y=y), col ='red') + 
-  ggtitle("") +
- theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
-#samma_det = inla.hyperpar(INLAOral)
+  ggtitle("Posterior marginals: kappa_v") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('kappa_v')
+
+grid.arrange(grobs = kappa_marginals_plot, ncol = 1)
 ```
+
+
+
 ```{r}
 u_inla = INLAOral$marginals.random$Region.struct[comp]
 v_inla = INLAOral$marginals.random$Region[comp]
 v_MCMC = samples$eta-samples$u
+```
+
+```{r, fig:u_inla, fig.width=5, fig.height=4, fig.cap="\\label{fig:u_inla} Posterior marginals from the estimation by INLA and corresponding histograms obtained by MCMC", echo = FALSE}
 
 u_inla_df = as.data.frame(u_inla[[1]])
 v_inla_df = as.data.frame(v_inla[[1]])
@@ -511,14 +532,14 @@ binw = 0.02
 u_plots[[1]] = ggplot(data.frame(samp = samples$u[comp[1],-burnins]), aes(samp)) + 
   geom_histogram(aes(y=..density..), binwidth = binw) + 
   geom_path(aes.inherit = FALSE, data = u_inla_df, aes(x=x, y=y), col ='red') + 
-  ggtitle("") +
- theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+  ggtitle("Posterior marginals: u components") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('u')
 
 v_plots[[1]] = ggplot(data.frame(samp = v_MCMC[comp[1],-burnins]), aes(samp)) + 
   geom_histogram(aes(y=..density..), binwidth = binw) + 
   geom_path(aes.inherit = FALSE, data = v_inla_df, aes(x=x, y=y), col ='red') + 
-  ggtitle("") +
- theme(plot.title = element_text(hjust = 0.5))
+  ggtitle("Posterior marginals: v components") +
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('v')
 
 for (i in 2:3){
   u_inla_df = as.data.frame(u_inla[[i]])
@@ -528,47 +549,52 @@ u_plots[[i]] = ggplot(data.frame(samp = samples$u[comp[i],-burnins]), aes(samp))
   geom_histogram(aes(y=..density..), binwidth = binw) + 
   geom_path(aes.inherit = FALSE, data = u_inla_df, aes(x=x, y=y), col ='red') + 
   ggtitle("") +
- theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('u')
 
 v_plots[[i]] = ggplot(data.frame(samp = v_MCMC[comp[i],-burnins]), aes(samp)) + 
   geom_histogram(aes(y=..density..), binwidth = binw) + 
   geom_path(aes.inherit = FALSE, data = v_inla_df, aes(x=x, y=y), col ='red') + 
   ggtitle("") +
- theme(plot.title = element_text(hjust = 0.5)) + xlab('x')
+ theme(plot.title = element_text(hjust = 0.5)) + xlab('v')
 }
 
-library(gridExtra)
 grid.arrange(grobs = u_plots, ncol = 1)
+```
+
+
+```{r, fig:v_inla, fig.width=5, fig.height=4, fig.cap="\\label{fig:v_inla} Posterior marginals from the estimation by INLA and corresponding histograms obtained by MCMC", echo = FALSE}
 grid.arrange(grobs = v_plots, ncol = 1)
 
 ```
 
 
 
+Figure \ref{fig:kappa_inla} shows the posterior marginals for $\kappa_u$ and $\kappa_v$ obtained by INLA. They have approximately the same shape as the corresponding histograms from the MCMC. Corresponding plots for the components of $\boldsymbol u$ and $\boldsymbol v$ are shown in figures \ref{fig:u_inla} and \ref{fig:v_inla}. Here, the distributions seem to correspond very nicely, meaning that the two methods arrive at almost exactly the same distributions. $\boldsymbol v$ is shown and not $\boldsymbol \eta$, since this is what is obtained in INLA. Samples from $\boldsymbol v$ are easily obtained for the MCMC from $\boldsymbol v = \boldsymbol \eta - \boldsymbol u$. 
 
+```{r, fig:germany_INLA, fig.width=5, fig.height=4, fig.cap="\\label{fig:germany_INLA} Posterior spatial dependency (exp(u)) of cases of oral cancer accross regions in Germany, obtained by INLA."}
 
-```{r}
 u_median = INLAOral$summary.random$Region.struct$`0.5quant`
 germany.plot(exp(u_median), col=col, legend=TRUE)
 ```
 
+We see, when comparing the figures \ref{germany_MCMC} and figure \ref{germany_INLA}, that we get the same spatial structure (up to what can be spotted by the eye) using INLA and MCMC. 
 
 ##b)
-We will now add some explanatory factors for getting oral cancer.
+We will now add smoke as an explanatory factor for getting oral cancer, both as a linear effect and a non-linear function using random walk.
 
 ```{r}
+#Add smoking to the data set to be able to use it as a covariate
 smoking = read.table("additionalFiles/smoking.dat")
-
 OralData["smoking"] = smoking
-
 ```
 
 ```{r}
-
+#Smoking as linear effect
 INLASmoking1 = inla(
   formula = Y ~ 
     f(Region.struct, model = "besag", graph = g, 
-      hyper = list(prec=list(prior="loggamma", param=c(alpha_u,beta_u))), constr = FALSE) + 
+      hyper = list(prec=list(prior="loggamma", 
+                             param=c(alpha_u,beta_u))), constr = FALSE) + 
     f(Region, model = "iid", 
       hyper = list(prec=list(param=c(alpha_v,beta_v)))) +
     smoking - 1, 
@@ -580,8 +606,9 @@ INLASmoking1 = inla(
 
 ```
 
+
 ```{r}
-#Constr = FALSE?
+#Smoking as non-linear effect
 INLASmoking2 = inla(
   formula = Y ~ -1 +
     f(Region.struct, model = "besag", graph = g, 
@@ -597,6 +624,9 @@ INLASmoking2 = inla(
 )
 ```
 
+We want to compare the three methods (With and without smoking as covariate), using Deviance Information criterion (DIC), which is often used on hierarchichal Bayesian models for model selection.
+One should prefer models with lower DIC.
+
 ```{r}
 #Finding the DICs
 DIC_spatial = INLAOral$dic$dic
@@ -610,25 +640,35 @@ cat('DIC for the linear smoking effect model:', DIC_smoking_linear,'\n')
 cat('DIC for the rw2 smoking model:', DIC_smoking_rw2)
 ```
 
+Comments on the DIC follow below. 
+Finally, we plot the posterior median for the non-linear smoking effect together with the $95\%$ credible intervals for the different smoking levels.
 
 ```{r}
 summary_smoking = INLASmoking2$summary.random$smoking
+
+#Obtain median and quantiles for the credible intervals 
 median_smoking = summary_smoking$`0.5quant`
 lower_quant_smoking = summary_smoking$`0.025quant`
 upper_quant_smoking = summary_smoking$`0.975quant`
-ID_smoking= summary_smoking$ID
 
+#Get the corresponding smoking amount
+ID_smoking= summary_smoking$ID
+```
+
+
+```{r, fig:median_smoking, fig.width=5, fig.height=4, fig.cap="\\label{fig:median_smoking} posterior median of the smoking effect (red line) with corresponding 95% credible interval (black lines).", echo = FALSE}
 smoking_df = data.frame(index = ID_smoking, median = median_smoking, lower = lower_quant_smoking, upper = upper_quant_smoking)
 
 ggplot(data = smoking_df, aes(x = index)) + 
   geom_path(aes(y = median), col = 'red') + 
   geom_path(aes(y = lower)) +
   geom_path(aes(y = upper)) +
-  xlab('smoking ID') + ylab('effect of smoking') +
+  xlab('smoking amount') + ylab('effect of smoking') +
   ggtitle("Non-linear smoking effect") +
   theme(plot.title = element_text(hjust = 0.5))
-  
 ```
-According to the DIC criterion the best model for our data is the one with a linear smoking effect. The difference between it and the model with a non-linear smoking effect is on the other hand minimal, and the model without a smoking effect is also close behind. The plot of the non-linear effect justifies this as it shows a clear trend from low smoking levels to high smoking levels. The effect is however close to linear, which means that the linear model will have similar predictions. In addition, zero is always contained in the $95\%$ credible interval which means that a model without an effect of smoking will also stay close to the models which accounts for it.
+
+
+According to the DIC criterion the best model for our data is the one with a linear smoking effect. The difference between this and the model with a non-linear smoking effect is on the other hand minimal, and the model without a smoking effect is also close behind. The plot of the non-linear effect, figure \ref{fig:median_smoking}, justifies this as it shows a clear trend from low smoking levels to high smoking levels. The effect is however close to linear, which means that the linear model will have similar predictions. In addition, zero is always contained in the $95\%$ credible interval which means that a model without an effect of smoking will also stay close to the models which account for it.
 
 
