@@ -20,5 +20,5 @@ $\kappa_u$ and $\kappa_v$ are the hyperparameters of the problem, and both preci
 &\kappa_u\sim\text{Gamma}(\alpha_u,\beta_u)\\
 &\kappa_v\sim\text{Gamma}(\alpha_v,\beta_v).
 \end{align*}
-We are going to assume $\alpha_u=\alpha_v=1$ and $\beta_u=\beta_v=0.01$. In order to study this spatial structure, we will implement a Gibbs sampler with a Metropolis-Hastings step to sample from the full posterior distribution.
+We are going to assume $\alpha_u=\alpha_v=1$ and $\beta_u=\beta_v=0.01$. In order to study this spatial structure, we will implement a Gibbs sampler with a Metropolis-Hastings step to sample from the joint posterior distribution.
 

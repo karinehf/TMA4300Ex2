@@ -9,7 +9,7 @@ From the definition of conditional probability and the nature of the assumptions
 \text{p}(\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v|\boldsymbol{y})&\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta},\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_u,\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u,\kappa_v)\text{p}(\kappa_u\,|\kappa_v)\text{p}(\kappa_v)\\
 &\propto\text{p}(\boldsymbol{y}\,|\boldsymbol{\eta})\text{p}(\boldsymbol{\eta}\,|\boldsymbol{u},\kappa_v)\text{p}(\boldsymbol{u}\,|\kappa_u)\text{p}(\kappa_u)\text{p}(\kappa_v).
 \end{align*}
-By inserting the corresponding probabilities, this becomes
+By inserting the corresponding functions, this becomes
 \begin{align*}
 \text{p}&\propto\left(\prod_{i=1}^n\left(E_ie^{\eta_i}\right)^{y_i}e^{E_ie^{\eta_i}}\right)\left|\kappa_v\text{I}\right|^\frac{1}{2}e^{-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})}\kappa_u^{(n-1)/2}e^{-\frac{\kappa_u}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u}}\kappa_u^{\alpha_u-1}e^{-\beta_u\kappa_u}\kappa_v^{\alpha_v-1}e^{-\beta_v\kappa_v}\\
 &\propto\kappa_u^{\frac{n-1}{2}+\alpha_u-1}\kappa_v^{\frac{n}{2}+\alpha_v-1}\exp\left\{-\beta_u\kappa_u-\beta_v\kappa_v-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})-\frac{\kappa_u}{2}\boldsymbol{u}^T\textbf{R}\boldsymbol{u}+\sum_i\left(y_i\eta_i-E_ie^{\eta_i}\right)\right\}.
@@ -51,7 +51,7 @@ We recognise this as the core of a gamma distribution which means that the full 
 \end{align*}
 We recognise this as the canonical form of a multivariate normal distribution. All these distributions are easy to sample from, and can be used in the Gibbs algorithm directly.
 
-The full conditional distribution for $\boldsymbol{\eta}$ however takes the form
+The full conditional distribution for $\boldsymbol{\eta}$ however, takes the form
 $$
 \text{p}(\boldsymbol\eta|\boldsymbol{y},\boldsymbol{u},\kappa_u,\kappa_v)\propto
 \exp\left\{-\frac{\kappa_v}{2}\left(\boldsymbol{\eta}-\boldsymbol{u}\right)^T(\boldsymbol{\eta}-\boldsymbol{u})+\sum_if(\eta_i)\right\}.
